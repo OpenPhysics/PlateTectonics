@@ -37,7 +37,8 @@
     "rename": "tsx scripts/rename-sim.ts",
     "scaffold-screens": "tsx scripts/scaffold-screens.ts",
     "clean": "rm -rf dist",
-    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true"
+    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "build-data": "tsx scripts/build-data.ts"
   },
   "dependencies": {
     "scenerystack": "^3.0.0"

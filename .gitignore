@@ -40,3 +40,6 @@ Thumbs.db
 
 # CI / local npm audit artifact (must not be linted)
 audit.json
+
+# Data-generation download cache (scripts/build-data.ts)
+.cache/

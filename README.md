@@ -8,7 +8,7 @@ mountains and trenches are all in the same places; or drop into a cross-section 
 a subduction zone, a spreading ridge or a transform fault, where the descending slab is
 fitted to the earthquakes that trace it.
 
-## What is on screen
+## Features
 
 **Global map**
 
@@ -35,7 +35,7 @@ The science, the sources and the model's limits are documented in
 [`doc/model.md`](doc/model.md); the code is documented in
 [`doc/implementation-notes.md`](doc/implementation-notes.md).
 
-## Quick start
+## Quick Start
 
 ```bash
 npm install
@@ -60,17 +60,7 @@ npm start        # dev server → http://localhost:5173
 `npm run build-data` writes `src/common/data/generated/`, which is committed — normal
 builds never touch the network. Downloads are cached under `.cache/data/`.
 
-## Data sources
-
-| Dataset | Source | Licence |
-|---|---|---|
-| Plate outlines, boundaries, Euler poles | Bird (2003), PB2002, doi:10.1029/2001GC000252, via [fraxen/tectonicplates](https://github.com/fraxen/tectonicplates) | ODC-BY 1.0 |
-| Coastlines | [Natural Earth](https://www.naturalearthdata.com/) 1:110 m land | Public domain |
-| Earthquakes | [USGS ANSS ComCat](https://earthquake.usgs.gov/fdsnws/event/1/) | Public domain |
-| Volcanoes | [NOAA NCEI](https://www.ngdc.noaa.gov/hazel/) / Smithsonian GVP Holocene volcano list | Public domain |
-| Elevation and bathymetry | [NOAA NCEI global DEM mosaic](https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer) | Public domain |
-
-## Tech stack
+## Tech Stack
 
 | Tool | Version | Purpose |
 |---|---|---|
@@ -82,6 +72,16 @@ builds never touch the network. Downloads are cached under `.cache/data/`.
 
 Localized in English, Spanish and French; ships default and projector colour profiles
 and full Interactive Description support.
+
+### Data sources
+
+| Dataset | Source | Licence |
+|---|---|---|
+| Plate outlines, boundaries, Euler poles | Bird (2003), PB2002, doi:10.1029/2001GC000252, via [fraxen/tectonicplates](https://github.com/fraxen/tectonicplates) | ODC-BY 1.0 |
+| Coastlines | [Natural Earth](https://www.naturalearthdata.com/) 1:110 m land | Public domain |
+| Earthquakes | [USGS ANSS ComCat](https://earthquake.usgs.gov/fdsnws/event/1/) | Public domain |
+| Volcanoes | [NOAA NCEI](https://www.ngdc.noaa.gov/hazel/) / Smithsonian GVP Holocene volcano list | Public domain |
+| Elevation and bathymetry | [NOAA NCEI global DEM mosaic](https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer) | Public domain |
 
 ## License
 

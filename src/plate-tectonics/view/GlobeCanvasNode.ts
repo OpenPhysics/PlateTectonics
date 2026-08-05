@@ -94,7 +94,7 @@ export class GlobeCanvasNode extends EarthCanvasNode {
   private bufferLat = new Float64Array(0);
   private bufferDepth = new Float64Array(0);
   private bufferVisible = new Uint8Array(0);
-  private bufferPlate = new Int32Array(0);
+  private bufferFrame = new Int32Array(0);
   private bufferSeam = new Uint8Array(0);
 
   /** View coordinates written by the most recent {@link projectLimbCrossing} call. */
@@ -228,18 +228,19 @@ export class GlobeCanvasNode extends EarthCanvasNode {
   protected override appendFeature(
     context: CanvasRenderingContext2D,
     coords: readonly number[],
-    plateIndices: number | readonly number[],
+    frames: number | readonly number[],
     mode: RingMode,
+    tearAtFrameChanges = false,
   ): void {
-    const count = this.traceFeature(coords, plateIndices);
+    const count = this.traceFeature(coords, frames);
     if (mode === "fill") {
       this.appendFilledOutline(context, count);
     } else {
       // Same tear rule as the flat map: once the plates have moved, neighbouring
       // coastline vertices riding different plates are hundreds of kilometres apart,
       // and joining them would draw a stray line across the ocean.
-      const breakAtPlateChanges = typeof plateIndices !== "number" && !this.reconstruction.isPresentDay;
-      this.appendVisiblePolyline(context, count, breakAtPlateChanges);
+      const breakAtFrameChanges = tearAtFrameChanges && typeof frames !== "number" && !this.reconstruction.isPresentDay;
+      this.appendVisiblePolyline(context, count, breakAtFrameChanges);
     }
   }
 
@@ -257,8 +258,8 @@ export class GlobeCanvasNode extends EarthCanvasNode {
    *
    * Returns how many points were buffered.
    */
-  private traceFeature(coords: readonly number[], plateIndices: number | readonly number[]): number {
-    const perVertex = typeof plateIndices !== "number";
+  private traceFeature(coords: readonly number[], frames: number | readonly number[]): number {
+    const perVertex = typeof frames !== "number";
     const sourceCount = coords.length / 2;
     this.bufferCount = 0;
 
@@ -266,7 +267,7 @@ export class GlobeCanvasNode extends EarthCanvasNode {
     let previousLat = 0;
 
     for (let vertex = 0; vertex < sourceCount; vertex++) {
-      const plateIndex = perVertex ? ((plateIndices[vertex] as number) ?? 0) : plateIndices;
+      const frame = perVertex ? ((frames[vertex] as number) ?? 0) : frames;
       const sourceLon = coords[vertex * 2] as number;
       const sourceLat = coords[vertex * 2 + 1] as number;
       // Whether the segment arriving here is a seam, judged on the *source*
@@ -276,7 +277,7 @@ export class GlobeCanvasNode extends EarthCanvasNode {
         vertex > 0 &&
         isSeamSegment(coords[vertex * 2 - 2] as number, coords[vertex * 2 - 1] as number, sourceLon, sourceLat);
 
-      this.reconstruction.transform(sourceLon, sourceLat, plateIndex);
+      this.reconstruction.transform(sourceLon, sourceLat, frame);
       const lon = this.reconstruction.lon;
       const lat = this.reconstruction.lat;
 
@@ -286,11 +287,11 @@ export class GlobeCanvasNode extends EarthCanvasNode {
           // Interpolated points belong to the segment they came from, so a tear
           // between two plates still falls on the last step of the segment.
           interpolateGreatCircle(previousLon, previousLat, lon, lat, step / steps);
-          this.pushVertex(interpolatedLon, interpolatedLat, plateIndex, seam);
+          this.pushVertex(interpolatedLon, interpolatedLat, frame, seam);
         }
       }
 
-      this.pushVertex(lon, lat, plateIndex, seam);
+      this.pushVertex(lon, lat, frame, seam);
       previousLon = lon;
       previousLat = lat;
     }
@@ -298,7 +299,7 @@ export class GlobeCanvasNode extends EarthCanvasNode {
   }
 
   /** Projects one point and appends it to the scratch buffers. */
-  private pushVertex(lon: number, lat: number, plateIndex: number, seam: boolean): void {
+  private pushVertex(lon: number, lat: number, frame: number, seam: boolean): void {
     if (this.bufferCount === this.bufferX.length) {
       this.growBuffers();
     }
@@ -309,7 +310,7 @@ export class GlobeCanvasNode extends EarthCanvasNode {
     this.bufferLon[at] = lon;
     this.bufferLat[at] = lat;
     this.bufferDepth[at] = this.globe.depth;
-    this.bufferPlate[at] = plateIndex;
+    this.bufferFrame[at] = frame;
     this.bufferSeam[at] = seam ? 1 : 0;
     this.bufferCount = at + 1;
   }
@@ -336,9 +337,9 @@ export class GlobeCanvasNode extends EarthCanvasNode {
     seam.set(this.bufferSeam);
     this.bufferSeam = seam;
 
-    const plate = new Int32Array(capacity);
-    plate.set(this.bufferPlate);
-    this.bufferPlate = plate;
+    const frame = new Int32Array(capacity);
+    frame.set(this.bufferFrame);
+    this.bufferFrame = frame;
   }
 
   /**
@@ -346,13 +347,13 @@ export class GlobeCanvasNode extends EarthCanvasNode {
    * limb so a line never continues across the face of the Earth from a point that is
    * really round the back.
    */
-  private appendVisiblePolyline(context: CanvasRenderingContext2D, count: number, breakAtPlateChanges: boolean): void {
+  private appendVisiblePolyline(context: CanvasRenderingContext2D, count: number, breakAtFrameChanges: boolean): void {
     let penDown = false;
 
     for (let index = 1; index < count; index++) {
       const previous = index - 1;
       const torn =
-        this.bufferSeam[index] === 1 || (breakAtPlateChanges && this.bufferPlate[index] !== this.bufferPlate[previous]);
+        this.bufferSeam[index] === 1 || (breakAtFrameChanges && this.bufferFrame[index] !== this.bufferFrame[previous]);
       penDown = this.linkVertices(context, previous, index, penDown, torn);
     }
   }
@@ -375,7 +376,7 @@ export class GlobeCanvasNode extends EarthCanvasNode {
 
     if (fromVisible && toVisible) {
       if (torn) {
-        // The two vertices ride plates that have moved apart: start a new run rather
+        // The two vertices ride frames that have moved apart: start a new run rather
         // than drawing a stray line across the gap.
         context.moveTo(toX, toY);
         return true;

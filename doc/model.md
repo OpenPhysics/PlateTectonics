@@ -11,8 +11,8 @@ The only state that evolves is a single number, `timeMillionsOfYearsProperty`: h
 far the reconstruction has been run from the present day, negative into the past.
 
 Each plate carries an **Euler pole** — an axis through the centre of the Earth — and
-a rotation rate about it. Moving a plate by `t` million years is one rigid rotation
-of every point on it:
+a rotation rate about it. Moving a point on a plate by `t` million years is one
+rotation:
 
 ```
 θ = rate (°/Myr) × t (Myr)          about the plate's pole
@@ -60,6 +60,47 @@ The result reproduces the speeds textbooks quote — Pacific ≈ 67 mm/yr WNW at
 Nazca ≈ 78 mm/yr ENE, Australia ≈ 67 mm/yr NNE, North America ≈ 16 mm/yr WSW — and
 `tests/PlateReconstruction.test.ts` checks them, so a sign error anywhere in that
 chain fails the test suite rather than quietly drawing the Atlantic closing.
+
+Two independent checks confirm the derivation. PB2002 also publishes a **relative**
+velocity across every boundary step, a number the poles here were not built from;
+recomputing it as `|ω₁ × r − ω₂ × r|` matches the published value to a median of
+0.04 mm/yr over all 1 580 segments (`tests/geophysicalData.test.ts`). And integrating
+`r × (ω × r)` over the whole globe — the condition that defines the no-net-rotation
+frame — leaves a residual equivalent to 0.009 °/Myr, about 1 mm/yr at the equator, so
+the frame really is the one it claims to be.
+
+## What carries what
+
+A plate's interior moves with the plate. A plate **boundary** cannot: it belongs to
+two plates at once, and carrying it with either one drives it into the other. That is
+where the gaps and overlaps in a naive reconstruction come from — run the clock to the
+end of the slider and the two sides of a typical boundary end up some 1 600 km apart,
+tearing the map open along the ridges and piling it up at the trenches.
+
+So boundaries are given rotations of their own:
+
+| Boundary | What it rides | Why |
+|---|---|---|
+| Spreading ridge | mean of the two plates' rotation vectors | where the axis sits when accretion is symmetric |
+| Transform fault | mean of the two | stationary with respect to a fault the plates merely slide along |
+| Subduction zone | the **overriding** plate | a trench is a feature of the plate that stays; the other is being consumed |
+
+PB2002 names each boundary section with a separator that doubles as a cross-section
+through it — `-` where neither plate descends, `\` where the left-hand plate descends
+beneath the right, `/` where the right-hand one does — so `NZ\SA` is Nazca going down
+under South America and `TO/PA` is the Pacific going down under Tonga. That is where
+the overriding plate is read from.
+
+Plate outlines are then carried by the boundary network rather than by the plate
+inside them, each vertex taking a distance-weighted blend of the boundary motions near
+it. Because the blend depends on *position alone*, two plates that share an edge carry
+it identically and the mosaic stays a mosaic. What changes through time is each
+plate's **area**: it grows along its spreading ridges and shrinks at its trenches,
+which is sea floor being made and unmade, and is the thing worth watching.
+
+The outlines are subdivided until this stops showing: an edge whose ends ride motions
+far enough apart to stretch it by more than 200 km over the slider's range is split
+and reconsidered. `tests/PlateEvolution.test.ts` holds the whole scheme in place.
 
 ## Earthquake depth bands
 
@@ -119,14 +160,26 @@ distorting the picture silently.
 
 ## What this model is not
 
-- **Plates are rigid.** Real plates deform, especially at their edges. Run the clock
-  and rigid plates overlap and leave gaps; that is the deformation the model does not
-  do, not a drawing error.
+- **Plate interiors are rigid.** Only the boundaries deform, and only in the sense
+  above — a plate changes area but never changes shape internally. The deforming belts
+  along real plate edges, which is where the Andes, the Himalaya and the Basin and
+  Range are, are drawn as though they were not deforming at all.
 - **Velocities are today's velocities.** Extrapolating them is reasonable over a few
   million years, a sketch at ±50 Myr (the ends of the slider), and wrong beyond that:
   ridges and subduction zones are born and die, and plates that existed 50 Myr ago —
   the Farallon plate, for one — are missing entirely because the model has no record of
   them. The range is capped at ±50 Myr for that reason.
+- **The microplates are the first thing to stop meaning anything.** PB2002 resolves
+  plates a couple of degrees across whose poles sit almost on top of them, so they
+  spin: ten of the fifty-two turn through more than half a revolution over 50 Myr, and
+  Manus through seven full turns. Nothing like that happened — such plates are
+  transient features that do not survive tens of millions of years — and because a
+  boundary is shared, a spinning microplate drags its larger neighbour's edge with it.
+  That is why the south-west Pacific and the Galápagos region look scribbled at the
+  ends of the slider while Africa, the Americas, Eurasia, Australia, Antarctica and
+  the Pacific stay clean. The sixteen labelled plates hold their area to within a
+  factor of four; the microplates do not, and no rule about how boundaries move can
+  rescue an Euler pole extrapolated that far.
 - **Earthquakes and volcanoes are present-day observations.** They ride their plate
   when the clock runs, so the picture stays coherent, but a 1994 earthquake did not
   happen 20 Myr ago somewhere else.

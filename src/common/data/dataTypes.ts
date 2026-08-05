@@ -20,8 +20,22 @@
 /** How the two plates on either side of a boundary move relative to each other. */
 export type BoundaryType = "divergent" | "convergent" | "transform";
 
-/** A rigid tectonic plate: outline, motion and label placement. */
-export interface PlateRecord {
+/**
+ * One rigid rotation of the Earth's surface: an axis through the centre of the Earth
+ * and a rate about it. Every feature the reconstruction moves is moved by one of
+ * these — see `PlateReconstruction` for the list, and for why a plate boundary needs
+ * a rotation that is not either neighbouring plate's.
+ */
+export interface RotationVector {
+  /** Euler pole of the rotation, in degrees. */
+  readonly poleLat: number;
+  readonly poleLon: number;
+  /** Rotation rate about that pole, degrees per million years, counter-clockwise. */
+  readonly poleRateDegPerMyr: number;
+}
+
+/** A tectonic plate: outline, absolute (no-net-rotation) motion and label placement. */
+export interface PlateRecord extends RotationVector {
   /** PB2002 two-letter plate code, e.g. `"PA"`. */
   readonly code: string;
   /** English plate name, e.g. `"Pacific"`. */
@@ -30,14 +44,20 @@ export interface PlateRecord {
   readonly major: boolean;
   /** Outline rings, each a flat `[lon, lat, …]` array. Plates that cross the antimeridian have several. */
   readonly rings: readonly (readonly number[])[];
+  /**
+   * Motion frame index per outline vertex, one array per ring.
+   *
+   * A plate's outline is not the plate: it is the plate's share of the boundaries
+   * around it, and a boundary belongs to both of the plates it separates. So an
+   * outline vertex rides the boundary under it rather than the plate inside it, which
+   * is what keeps the mosaic of plates a mosaic when the clock runs — the plate grows
+   * along its ridges and shrinks at its trenches instead of overlapping and gapping
+   * with its neighbours. See `PlateReconstruction`.
+   */
+  readonly ringFrames: readonly (readonly number[])[];
   /** Where to anchor the plate's name and motion vector, in degrees. */
   readonly labelLon: number;
   readonly labelLat: number;
-  /** Euler pole of the plate's absolute (no-net-rotation) motion, in degrees. */
-  readonly poleLat: number;
-  readonly poleLon: number;
-  /** Rotation rate about that pole, degrees per million years, counter-clockwise. */
-  readonly poleRateDegPerMyr: number;
 }
 
 /**
@@ -60,8 +80,11 @@ export interface BoundarySegmentRecord {
   readonly plates: string;
   /** Mean relative velocity across the boundary, mm/year. */
   readonly velocityMmPerYear: number;
-  /** Index of the plate the segment rides during a reconstruction (the first plate named). */
-  readonly plateIndex: number;
+  /**
+   * Motion frame the segment rides during a reconstruction: the mean of the two
+   * plates at a ridge or a transform, the overriding plate at a subduction zone.
+   */
+  readonly frameIndex: number;
   /** Flat `[lon, lat, …]` polyline in degrees. */
   readonly coords: readonly number[];
 }

@@ -1,8 +1,8 @@
 /**
  * PlateReconstruction.ts
  *
- * Rigid-plate kinematics: where a point on a plate was (or will be) after `t`
- * million years of the plate's present-day motion.
+ * Plate kinematics: where a point on the Earth's surface was (or will be) after `t`
+ * million years of today's plate motions.
  *
  * Each plate in `PLATES` carries an Euler pole — an axis through the centre of the
  * Earth — and a rotation rate about it in degrees per million years, in the
@@ -11,28 +11,58 @@
  * evaluates with Rodrigues' rotation formula.
  *
  *   reconstruction.setTime(-20);                       // 20 Myr ago
- *   reconstruction.transform(lon, lat, plateIndex);    // writes .lon and .lat
+ *   reconstruction.transform(lon, lat, frameIndex);    // writes .lon and .lat
  *
  * `transform` writes its result into public scratch fields instead of returning an
  * object: the map renderer calls it tens of thousands of times per frame while the
  * clock runs, and allocating there would dominate the frame budget.
  *
+ * ── Why a *frame* index and not a plate index ─────────────────────────────────
+ * Anything in the interior of a plate — a coastline, an epicentre, a volcano — rides
+ * that plate. A plate *boundary* cannot: it belongs to two plates at once, and moving
+ * it with either one drives it into the other. Carrying every plate outline rigidly
+ * is what makes a naive reconstruction tear the map open at the ridges and pile it up
+ * at the trenches, with the two sides of a boundary a thousand kilometres apart after
+ * 50 Myr.
+ *
+ * So boundaries ride rotations of their own, computed at build time and listed in
+ * `DERIVED_MOTION_FRAMES`: the mean of the two plates' rotation vectors at a ridge or
+ * a transform, and the overriding plate at a subduction zone. {@link MOTION_FRAMES}
+ * puts the plates first and those frames after, so a plate index *is* a frame index
+ * and everything below takes one kind of number.
+ *
+ * The plate outlines are pinned to those same frames vertex by vertex
+ * (`PlateRecord.ringFrames`), so two plates that share an edge carry it identically
+ * and the mosaic stays closed. What changes through time is each plate's *area*:
+ * it grows along its ridges and shrinks at its trenches, which is the sea floor being
+ * made and unmade — the thing the reconstruction is there to show.
+ *
  * ── Caveats worth teaching ────────────────────────────────────────────────────
  * This extrapolates *today's* velocities. It is a good approximation for the last
  * few million years, a rough sketch at ±50 Myr (plate motions change as ridges and
  * subduction zones are born and die), and says nothing about plates that no longer
- * exist. It also treats each plate as perfectly rigid, so overlaps and gaps open
- * up where real plates would deform, rift or subduct.
+ * exist. Plate interiors are treated as rigid, so the deformed belts along their
+ * edges — the Andes, the Himalaya, the Basin and Range — are drawn as if they were
+ * not deforming at all.
  */
 
 import { EARTH_RADIUS_KM } from "../PlateTectonicsConstants.js";
+import type { RotationVector } from "./data/dataTypes.js";
+import { DERIVED_MOTION_FRAMES } from "./data/generated/motionFrameData.js";
 import { PLATES } from "./data/generated/plateData.js";
 
 const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;
 
-/** Number of matrix entries stored per plate. */
+/** Number of matrix entries stored per frame. */
 const MATRIX_SIZE = 9;
+
+/**
+ * Every rotation the reconstruction can apply, in index order: the plates first — so
+ * a plate index and a frame index are the same number — then the rotations derived
+ * for the plate boundaries.
+ */
+export const MOTION_FRAMES: readonly RotationVector[] = [...PLATES, ...DERIVED_MOTION_FRAMES];
 
 /** Absolute velocity of a point riding a plate. */
 export interface PlateVelocity {
@@ -43,8 +73,8 @@ export interface PlateVelocity {
 }
 
 export class PlateReconstruction {
-  /** Row-major 3×3 rotation matrix per plate, packed end to end. */
-  private readonly matrices = new Float64Array(PLATES.length * MATRIX_SIZE);
+  /** Row-major 3×3 rotation matrix per motion frame, packed end to end. */
+  private readonly matrices = new Float64Array(MOTION_FRAMES.length * MATRIX_SIZE);
 
   /** Longitude written by the most recent {@link transform} call, in degrees. */
   public lon = 0;
@@ -64,8 +94,8 @@ export class PlateReconstruction {
   }
 
   /**
-   * Rebuilds the per-plate rotation matrices for `timeMyr` million years from the
-   * present (negative into the past). Cheap enough to call every frame.
+   * Rebuilds the per-frame rotation matrices for `timeMyr` million years from the
+   * present (negative into the past). Cheap enough to call every animation frame.
    */
   public setTime(timeMyr: number): void {
     if (timeMyr === this.timeMyr) {
@@ -73,8 +103,8 @@ export class PlateReconstruction {
     }
     this.timeMyr = timeMyr;
 
-    for (let index = 0; index < PLATES.length; index++) {
-      const plate = PLATES[index] as (typeof PLATES)[number];
+    for (let index = 0; index < MOTION_FRAMES.length; index++) {
+      const plate = MOTION_FRAMES[index] as RotationVector;
       const angle = plate.poleRateDegPerMyr * timeMyr * DEG_TO_RAD;
 
       const poleLatRad = plate.poleLat * DEG_TO_RAD;
@@ -103,14 +133,16 @@ export class PlateReconstruction {
   }
 
   /**
-   * Moves a geographic point with its plate, writing the result to {@link lon} and
-   * {@link lat}. At the present day this is the identity and returns immediately.
+   * Moves a geographic point with whatever carries it, writing the result to
+   * {@link lon} and {@link lat}. At the present day this is the identity and returns
+   * immediately.
    *
    * @param lon - present-day longitude, degrees
    * @param lat - present-day latitude, degrees
-   * @param plateIndex - index into `PLATES` of the plate carrying the point
+   * @param frameIndex - index into {@link MOTION_FRAMES}; a plate index for anything
+   * inside a plate, and the boundary's own frame for anything on one
    */
-  public transform(lon: number, lat: number, plateIndex: number): void {
+  public transform(lon: number, lat: number, frameIndex: number): void {
     if (this.isPresentDay) {
       this.lon = lon;
       this.lat = lat;
@@ -125,7 +157,7 @@ export class PlateReconstruction {
     const z = Math.sin(latRad);
 
     const m = this.matrices;
-    const at = plateIndex * MATRIX_SIZE;
+    const at = frameIndex * MATRIX_SIZE;
     const rx = (m[at] as number) * x + (m[at + 1] as number) * y + (m[at + 2] as number) * z;
     const ry = (m[at + 3] as number) * x + (m[at + 4] as number) * y + (m[at + 5] as number) * z;
     const rz = (m[at + 6] as number) * x + (m[at + 7] as number) * y + (m[at + 8] as number) * z;
@@ -135,13 +167,13 @@ export class PlateReconstruction {
   }
 
   /**
-   * Absolute (no-net-rotation) velocity of the plate at a point: v = ω × r.
+   * Absolute (no-net-rotation) velocity of a motion frame at a point: v = ω × r.
    *
    * With ω in radians per million year and r in km, |v| comes out in km per million
    * years, which is the same number as mm/year — the unit plate speeds are quoted in.
    */
-  public static velocityAt(plateIndex: number, lon: number, lat: number): PlateVelocity {
-    const plate = PLATES[plateIndex];
+  public static velocityAt(frameIndex: number, lon: number, lat: number): PlateVelocity {
+    const plate = MOTION_FRAMES[frameIndex];
     if (!plate) {
       return { speedMmPerYear: 0, azimuthDeg: 0 };
     }

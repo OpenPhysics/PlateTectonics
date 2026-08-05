@@ -12,7 +12,7 @@ import { depthBand, passesDepthFilter } from "../src/plate-tectonics/model/Earth
 import { PlateTectonicsModel, TIME_RANGE } from "../src/plate-tectonics/model/PlateTectonicsModel.js";
 
 describe("PlateTectonicsModel", () => {
-  it("starts with every layer on, at the present day, on the flat global map", () => {
+  it("starts with every observational layer on, at the present day, on the flat global map", () => {
     const model = new PlateTectonicsModel();
     expect(model.showPlatesProperty.value).toBe(true);
     expect(model.showGlobeProperty.value).toBe(false);
@@ -23,6 +23,9 @@ describe("PlateTectonicsModel", () => {
     expect(model.showEarthquakesProperty.value).toBe(true);
     expect(model.showVolcanoesProperty.value).toBe(true);
     expect(model.showTopographyProperty.value).toBe(true);
+    // The one layer that starts off: isochrons are an argument to be switched on, not
+    // a background to browse.
+    expect(model.showSeafloorAgeProperty.value).toBe(false);
     expect(model.earthquakeDepthFilterProperty.value).toBe("all");
     expect(model.selectedViewProperty.value).toBe("global");
     expect(model.timeMillionsOfYearsProperty.value).toBe(0);
@@ -131,6 +134,7 @@ describe("PlateTectonicsModel", () => {
     model.showEarthquakesProperty.value = false;
     model.showVolcanoesProperty.value = false;
     model.showTopographyProperty.value = false;
+    model.showSeafloorAgeProperty.value = true;
     model.earthquakeDepthFilterProperty.value = "deep";
     model.selectedViewProperty.value = "transform";
     model.timeSpeedProperty.value = TimeSpeed.FAST;
@@ -145,6 +149,7 @@ describe("PlateTectonicsModel", () => {
     expect(model.showEarthquakesProperty.value).toBe(true);
     expect(model.showVolcanoesProperty.value).toBe(true);
     expect(model.showTopographyProperty.value).toBe(true);
+    expect(model.showSeafloorAgeProperty.value).toBe(false);
     expect(model.earthquakeDepthFilterProperty.value).toBe("all");
     expect(model.selectedViewProperty.value).toBe("global");
     expect(model.timeSpeedProperty.value).toBe(TimeSpeed.NORMAL);

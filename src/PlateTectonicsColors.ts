@@ -131,6 +131,42 @@ const PlateTectonicsColors = {
     new ProfileColorProperty(PlateTectonicsNamespace, "plate8", { default: "#ff8080", projector: "#b83b3b" }),
   ],
 
+  /**
+   * Stops of the seafloor-age ramp, youngest first, evenly spaced from brand-new
+   * crust to {@link MAX_SEAFLOOR_AGE_MA}. An isochron is drawn in the colour its own
+   * age falls at, interpolated between the two stops either side of it.
+   *
+   * Red for the youngest and blue for the oldest is the convention every published
+   * age grid uses, and it is worth keeping even though it puts the young end of the
+   * ramp near the red of a divergent boundary: the youngest crust genuinely *is* the
+   * crust along the ridge, so the two agreeing is the point rather than a collision.
+   * They stay apart in the ways that matter — an isochron is drawn thinner than a
+   * boundary ({@link ISOCHRON_LINE_WIDTH}), underneath it, and never alone, since a
+   * lone red line is a ridge and a fan of them is the sea floor it made.
+   */
+  seafloorAgeRampColorProperties: [
+    new ProfileColorProperty(PlateTectonicsNamespace, "seafloorAgeYoungest", {
+      default: "#ff4b3e",
+      projector: "#c0271b",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "seafloorAgeYoung", {
+      default: "#ffa33c",
+      projector: "#b56a00",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "seafloorAgeMiddle", {
+      default: "#8ad46a",
+      projector: "#3f8b2f",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "seafloorAgeOld", {
+      default: "#4aa8d8",
+      projector: "#1a6a92",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "seafloorAgeOldest", {
+      default: "#4257c9",
+      projector: "#26307f",
+    }),
+  ],
+
   /** Outline drawn around every plate polygon. */
   plateOutlineColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "plateOutline", {
     default: "#dbe4f5",

@@ -42,6 +42,7 @@ the map show, and it is why the Nazca arrow is long and the Antarctic arrow is a
 | Volcanoes | NOAA NCEI Holocene volcano list (Smithsonian GVP holdings) | ~1 600 volcanoes |
 | Hotspots | Hand-maintained list of the plumes named in introductory texts | `src/common/data/hotspots.ts` |
 | Topography and bathymetry | NOAA NCEI global DEM mosaic | rendered to a shaded relief raster, and sampled along each cross-section |
+| Age of the ocean floor | EarthByte / Seton et al. (2020) present-day age grid, doi:10.1029/2020GC009214 | contoured into isochrons at 10, 20, 40 … 180 Ma |
 
 ### From PB2002's poles to absolute plate motion
 
@@ -102,6 +103,37 @@ The outlines are subdivided until this stops showing: an edge whose ends ride mo
 far enough apart to stretch it by more than 200 km over the slider's range is split
 and reconsidered. `tests/PlateEvolution.test.ts` holds the whole scheme in place.
 
+## Seafloor isochrons
+
+The **Seafloor age** layer draws the ocean floor's isochrons: the lines along which
+the crust is all one age, at 10, 20, 40 … 180 Ma. They come from the EarthByte
+present-day age grid, which is built by identifying marine magnetic anomalies —
+stripes of alternating remanent magnetisation frozen into basalt as it cools through
+the Curie point — and dating them against the geomagnetic polarity timescale, itself
+calibrated on radiometrically dated rock. `scripts/build-data.ts` contours the
+6-arc-minute grid with marching squares on a 0.3° mesh and simplifies what comes out.
+
+The picture is the argument for seafloor spreading, and it is worth reading in three
+steps:
+
+1. **The youngest crust is at the ridges.** The 10 Ma line runs a degree or two either
+   side of every spreading axis and nowhere else.
+2. **The pattern is symmetric.** The same age appears at about the same distance on
+   *both* flanks, because both plates take roughly half the new crust. Across the
+   Atlantic at 24° N the 40 Ma line sits about 5° west and 7° east of the axis, the
+   80 Ma line about 12° and 13°; `tests/geophysicalData.test.ts` asserts that ordering
+   and that symmetry.
+3. **It stops at about 180 Ma.** There is no older ocean floor to find, because it has
+   all been subducted, while the continents carry rock a *hundred* times older. The
+   sea floor is not old and permanent; it is a conveyor.
+
+An isochron is frozen into the crust, so unlike a plate boundary it rides its plate —
+vertex by vertex, because one isochron can cross several. Two consequences follow when
+the clock runs, and both are honest rather than cosmetic. The two flanks of a pair walk
+back towards the ridge that made them. And crust younger than the reconstruction has
+reached did not exist yet, so at 50 Myr ago the 10, 20 and 40 Ma isochrons are simply
+not drawn.
+
 ## Earthquake depth bands
 
 Hypocentres are grouped at **70 km** and **300 km**, the conventional shallow /
@@ -156,7 +188,10 @@ distorting the picture silently.
    and watch the events step down along the slab from the trench to 600 km.
 3. **Seafloor spreading.** Switch on boundaries and topography, and follow the ridges:
    a continuous mountain range down the middle of the Atlantic, marked by shallow
-   earthquakes and no deep ones at all.
+   earthquakes and no deep ones at all. Then add **Seafloor age** and turn the other
+   layers off: the isochrons fan out from that same mountain range, matched pair by
+   matched pair, red at the axis and blue at the margins. Run the clock back and watch
+   the young ones disappear into the ridge that had not yet made them.
 
 ## What this model is not
 
@@ -186,6 +221,12 @@ distorting the picture silently.
 - **The relief raster is present-day.** It is hidden as soon as the reconstruction
   moves off the present day, because sea floor that has not been created yet cannot be
   shown.
+- **Isochrons are carried rigidly, not un-made.** Hiding the ones younger than the
+  reconstruction is right, but the ones that remain are only *rotated* back with their
+  plates: the ocean between them should also be closing up, and here it is not, because
+  the model has no way to un-make crust. So running to 50 Myr ago narrows the Atlantic
+  isochron fan by rather less than it should. The 10 Ma pair walking together onto the
+  ridge is the honest part of that picture; the 160 Ma pair barely moving is not.
 - **Hotspots do not move.** That is deliberate, and it is the physics: a plume is
   anchored in the deep mantle while the plate slides over it, which is why the Hawaiian
   chain gets older to the north-west.

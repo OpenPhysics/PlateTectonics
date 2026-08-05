@@ -66,12 +66,14 @@ export class PlateTectonicsScreenSummaryContent extends ScreenSummaryContent {
         model.showEarthquakesProperty,
         model.showVolcanoesProperty,
         model.showTopographyProperty,
+        model.showSeafloorAgeProperty,
         layerStrings.platesStringProperty,
         layerStrings.plateBoundariesStringProperty,
         layerStrings.motionVectorsStringProperty,
         layerStrings.earthquakesStringProperty,
         layerStrings.volcanoesStringProperty,
         layerStrings.topographyStringProperty,
+        layerStrings.seafloorAgeStringProperty,
       ],
       (
         plates: boolean,
@@ -80,12 +82,14 @@ export class PlateTectonicsScreenSummaryContent extends ScreenSummaryContent {
         earthquakes: boolean,
         volcanoes: boolean,
         topography: boolean,
+        seafloorAge: boolean,
         platesName: string,
         boundariesName: string,
         vectorsName: string,
         earthquakesName: string,
         volcanoesName: string,
         topographyName: string,
+        seafloorAgeName: string,
       ) =>
         [
           plates ? platesName : null,
@@ -94,6 +98,7 @@ export class PlateTectonicsScreenSummaryContent extends ScreenSummaryContent {
           earthquakes ? earthquakesName : null,
           volcanoes ? volcanoesName : null,
           topography ? topographyName : null,
+          seafloorAge ? seafloorAgeName : null,
         ]
           .filter((name): name is string => name !== null)
           .join(", "),

@@ -58,6 +58,15 @@ export class PlateTectonicsModel implements TModel {
   /** The shaded relief raster: land topography and ocean-floor bathymetry. */
   public readonly showTopographyProperty = new BooleanProperty(true);
 
+  /**
+   * Isochrons of the ocean floor — lines of equal crustal age, coloured young to old.
+   *
+   * Off by default: it is the one layer that is an argument rather than an
+   * observation to be browsed, and it reads best switched on deliberately, over a map
+   * whose other layers have been turned down.
+   */
+  public readonly showSeafloorAgeProperty = new BooleanProperty(false);
+
   // ── Filtering ───────────────────────────────────────────────────────────────
 
   /** Which earthquake depth band to show. */
@@ -176,6 +185,7 @@ export class PlateTectonicsModel implements TModel {
     this.showEarthquakesProperty.reset();
     this.showVolcanoesProperty.reset();
     this.showTopographyProperty.reset();
+    this.showSeafloorAgeProperty.reset();
     this.earthquakeDepthFilterProperty.reset();
     this.selectedViewProperty.reset();
     this.timeSpeedProperty.reset();

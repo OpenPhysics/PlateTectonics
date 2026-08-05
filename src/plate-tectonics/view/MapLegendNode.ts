@@ -38,6 +38,7 @@ export class MapLegendNode extends PlateTectonicsPanel {
       { swatch: "volcano", label: legendStrings.volcanoStringProperty },
       { swatch: "hotspot", label: legendStrings.hotspotStringProperty },
       { swatch: "motion", label: legendStrings.motionStringProperty },
+      { swatch: "seafloorAge", label: legendStrings.seafloorAgeStringProperty },
     ];
 
     const items: Node[] = entries.map(

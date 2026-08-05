@@ -19,7 +19,8 @@
     "motionVectors": "Vectores de movimiento",
     "earthquakes": "Terremotos",
     "volcanoes": "Volcanes y puntos calientes",
-    "topography": "Topografía / batimetría"
+    "topography": "Topografía / batimetría",
+    "seafloorAge": "Edad del fondo oceánico (isócronas)"
   },
   "depthFilter": {
     "title": "Profundidad de los terremotos",
@@ -46,7 +47,8 @@
     "deep": "Terremoto profundo",
     "volcano": "Volcán",
     "hotspot": "Punto caliente",
-    "motion": "Movimiento de placas"
+    "motion": "Movimiento de placas",
+    "seafloorAge": "Edad del fondo 0–180 Ma"
   },
   "section": {
     "trench": "Fosa",
@@ -65,11 +67,11 @@
     "verticalExaggeration": "Relieve exagerado ×{{value}} verticalmente",
     "relativeMotion": "{{value}} mm/año"
   },
-  "dataSources": "Placas: Bird (2003) · Terremotos: USGS · Volcanes: NOAA/GVP · Relieve: NOAA",
+  "dataSources": "Placas: Bird (2003) · Terremotos: USGS · Volcanes: NOAA/GVP · Relieve: NOAA · Edad del fondo: EarthByte",
   "a11y": {
     "plateTectonics": {
       "screenSummary": {
-        "playArea": "El área de juego muestra un mapa de las placas tectónicas de la Tierra, o un corte transversal a través de un límite de placas. Encima se pueden dibujar capas de datos reales: límites de placas coloreados por tipo, flechas del movimiento de las placas, epicentros de terremotos, volcanes y puntos calientes, y el relieve sombreado de la superficie terrestre y del fondo marino.",
+        "playArea": "El área de juego muestra un mapa de las placas tectónicas de la Tierra, o un corte transversal a través de un límite de placas. Encima se pueden dibujar capas de datos reales: límites de placas coloreados por tipo, flechas del movimiento de las placas, epicentros de terremotos, volcanes y puntos calientes, el relieve sombreado de la superficie terrestre y del fondo marino, e isócronas del fondo oceánico — líneas de igual edad de la corteza, paralelas a las dorsales y cada vez más antiguas al alejarse de ellas.",
         "controlArea": "El área de control tiene un selector de vista, una casilla para cada capa de datos, un filtro de profundidad de terremotos, controles que hacen avanzar y retroceder el movimiento de las placas en el tiempo geológico, y un botón de Restablecer todo.",
         "interactionHint": "Active un par de capas y busque dónde coinciden: terremotos y volcanes alrededor del Pacífico, o dorsales y terremotos superficiales en medio del Atlántico."
       },
@@ -107,6 +109,7 @@
         "earthquakes": "Terremotos",
         "volcanoes": "Volcanes y puntos calientes",
         "topography": "Topografía y batimetría",
+        "seafloorAge": "Isócronas de edad del fondo oceánico",
         "depthFilter": "Profundidad de los terremotos",
         "depthFilterHelp": "Muestre terremotos de todas las profundidades, o solo de una banda de profundidad.",
         "timeSlider": "Tiempo geológico",

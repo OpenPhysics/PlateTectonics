@@ -20,11 +20,13 @@
  *  - USGS ANSS ComCat earthquake catalogue (public domain).
  *  - NOAA NCEI Holocene volcano list (public domain).
  *  - NOAA NCEI global elevation/bathymetry DEM mosaic (public domain).
+ *  - EarthByte / Seton et al. (2020) present-day seafloor age grid (CC BY 4.0).
  */
 
+import { type ScalarGrid, traceContours } from "./data/contour.js";
 import { fetchElevationGrid, sampleElevation } from "./data/dem.js";
 import { numberArray, round, wrap, writeGeneratedModule } from "./data/emit.js";
-import { fetchJson, fetchText } from "./data/fetchCache.js";
+import { fetchBinary, fetchJson, fetchText } from "./data/fetchCache.js";
 import {
   cross,
   dot,
@@ -39,6 +41,7 @@ import {
   toLonLat,
   toUnitVector,
 } from "./data/geo.js";
+import { readNetCdf } from "./data/netcdf.js";
 
 const GENERATED_DIR = "src/common/data/generated";
 
@@ -51,6 +54,8 @@ const POLES_URL = "http://peterbird.name/oldFTP/PB2002/PB2002_poles.dat.txt";
 const LAND_URL = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.geojson";
 const USGS_QUERY = "https://earthquake.usgs.gov/fdsnws/event/1/query";
 const VOLCANO_QUERY = "https://www.ngdc.noaa.gov/hazel/hazard-service/api/v1/volcanolocs";
+/** Seton et al. (2020) present-day age of the ocean floor, 6-minute grid, netCDF-3. */
+const AGE_GRID_URL = "https://www.earthbyte.org/webdav/ftp/earthbyte/agegrid/2020/Grids/age.2020.1.GTS2012.6m.grd";
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
 
@@ -1052,6 +1057,136 @@ in recorded history; \`plateIndex\` is the plate the volcano rides.`,
   return volcanoes;
 }
 
+// ── Seafloor age ──────────────────────────────────────────────────────────────
+
+/**
+ * Ages, in millions of years, that get an isochron.
+ *
+ * Twenty-Myr steps out to 180 Ma, which is about as old as the ocean floor gets —
+ * anything older has been subducted — plus a 10 Ma line, because the youngest crust
+ * is the point of the picture and on a slow ridge the 20 Ma line is already only two
+ * or three degrees from the axis.
+ */
+const ISOCHRON_AGES_MA: readonly number[] = [10, 20, 40, 60, 80, 100, 120, 140, 160, 180];
+
+/**
+ * Every *n*th sample of the 6-minute age grid is contoured, giving a 0.3° mesh. The
+ * closest-spaced isochrons in the data — 20 Myr apart on the slowest ridges, in the
+ * Arctic and the south-west Indian Ocean — are still a couple of degrees apart, so
+ * this resolves them with room to spare while keeping the trace to a size worth
+ * committing.
+ */
+const AGE_GRID_STRIDE = 3;
+
+/** Douglas–Peucker tolerance for an isochron, in degrees. */
+const ISOCHRON_TOLERANCE = 0.15;
+
+/**
+ * Shortest isochron kept, in degrees of arc. Below this a line is a speckle — a
+ * cell or two of noise in the age grid around a fracture zone or a seamount — rather
+ * than a piece of the seafloor spreading record.
+ */
+const MIN_ISOCHRON_DEGREES = 4;
+
+interface IsochronBuild {
+  ageMa: number;
+  points: LonLat[];
+}
+
+/** Rough length of a polyline in degrees of arc, good enough to reject speckle. */
+function polylineDegrees(points: readonly LonLat[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += separationDegrees(points[i - 1] as LonLat, points[i] as LonLat);
+  }
+  return total;
+}
+
+/**
+ * Traces the isochrons of the ocean floor: the lines along which the crust is a
+ * given age, from the EarthByte grid of radiometric and magnetic-anomaly ages.
+ *
+ * The grid is NaN over continental crust, so the contours end at the edge of the
+ * ocean by themselves, and they close round the ridges without any help because the
+ * grid is gridline-registered and its first and last columns are the same meridian.
+ */
+async function buildSeafloorAge(plates: readonly PlateBuild[]): Promise<void> {
+  const file = readNetCdf(await fetchBinary(AGE_GRID_URL, "earthbyte_age_6m.grd"));
+  const age = file.variables.get("z");
+  const lonAxis = file.variables.get("lon");
+  const latAxis = file.variables.get("lat");
+  if (!(age && lonAxis && latAxis)) {
+    throw new Error("The age grid is missing one of its lon, lat and z variables");
+  }
+  const [rows, columns] = age.shape as [number, number];
+
+  // Take every AGE_GRID_STRIDEth sample. Both axis lengths are one more than a
+  // multiple of the stride, so the last sample taken is the last one in the grid and
+  // the ±180° seam still lands on a column.
+  const width = Math.floor((columns - 1) / AGE_GRID_STRIDE) + 1;
+  const height = Math.floor((rows - 1) / AGE_GRID_STRIDE) + 1;
+  const values = new Float64Array(width * height);
+  for (let row = 0; row < height; row++) {
+    for (let column = 0; column < width; column++) {
+      values[row * width + column] = age.values[row * AGE_GRID_STRIDE * columns + column * AGE_GRID_STRIDE] as number;
+    }
+  }
+  const grid: ScalarGrid = { width, height, values };
+
+  // The axes are regular, so two samples give the whole mapping — and reading them
+  // rather than assuming −180…180 / −90…90 is what catches a grid published the
+  // other way up.
+  const lonOf = axisMapper(lonAxis.values, AGE_GRID_STRIDE);
+  const latOf = axisMapper(latAxis.values, AGE_GRID_STRIDE);
+
+  const isochrons: IsochronBuild[] = [];
+  for (const ageMa of ISOCHRON_AGES_MA) {
+    for (const line of traceContours(grid, ageMa)) {
+      const points: LonLat[] = [];
+      for (let i = 0; i < line.length; i += 2) {
+        points.push([lonOf(line[i] as number), latOf(line[i + 1] as number)]);
+      }
+      const simplified = simplify(points, ISOCHRON_TOLERANCE);
+      if (simplified.length >= 2 && polylineDegrees(simplified) >= MIN_ISOCHRON_DEGREES) {
+        isochrons.push({ ageMa, points: simplified });
+      }
+    }
+  }
+
+  const entries = isochrons.map((isochron) => {
+    const coords = numberArray(isochron.points.flatMap(([lon, lat]) => [round(lon, 2), round(lat, 2)]));
+    const plateIndices = numberArray(isochron.points.map(([lon, lat]) => plateIndexAt(plates, lon, lat)));
+    return `  { ageMa: ${isochron.ageMa},\n    coords: ${coords},\n    plateIndices: ${plateIndices} },`;
+  });
+
+  writeGeneratedModule(
+    `${GENERATED_DIR}/seafloorAgeData.ts`,
+    `Isochrons of the ocean floor: the lines along which the crust is 10, 20, 40 … 180
+million years old, contoured from the EarthByte present-day age grid (Seton et al.,
+2020), which is built from marine magnetic anomalies calibrated against radiometric
+dates of sea-floor basalt.
+
+Every vertex carries the index of the plate that carries it, because an isochron is
+frozen into the crust: it rides the plate it is part of, and running the clock back
+walks it into the ridge it was made at. There are no isochrons on continental crust —
+the grid has no values there — which is the shape of the story: the ocean floor is
+young and symmetric about the ridges, the continents are neither.`,
+    `import type { IsochronRecord } from "../dataTypes.js";\n\n/** The ages, in millions of years, that have an isochron in {@link ISOCHRONS}. */\nexport const ISOCHRON_AGES_MA: readonly number[] = ${numberArray(
+      ISOCHRON_AGES_MA,
+    )};\n\nexport const ISOCHRONS: readonly IsochronRecord[] = [\n${entries.join("\n")}\n];\n`,
+  );
+
+  const vertices = isochrons.reduce((total, isochron) => total + isochron.points.length, 0);
+  console.log(`  ${isochrons.length} isochrons at ${ISOCHRON_AGES_MA.length} ages, ${vertices} vertices`);
+}
+
+/** Maps a strided grid index back to its coordinate, from a regular netCDF axis. */
+function axisMapper(axis: Float64Array, stride: number): (index: number) => number {
+  const first = axis[0] as number;
+  const step = ((axis[axis.length - 1] as number) - first) / (axis.length - 1);
+  return (index: number) => first + index * stride * step;
+}
+
 // ── Relief raster ─────────────────────────────────────────────────────────────
 
 /**
@@ -1365,7 +1500,7 @@ real events projected onto the profile from a corridor either side of it.`,
  * `plate-model` covers the plates, their boundaries and the motion frames together,
  * because those three index into each other and only mean anything as a set.
  */
-const STEPS = ["plate-model", "land", "earthquakes", "volcanoes", "relief", "cross-sections"] as const;
+const STEPS = ["plate-model", "land", "earthquakes", "volcanoes", "seafloor-age", "relief", "cross-sections"] as const;
 type Step = (typeof STEPS)[number];
 
 async function main(): Promise<void> {
@@ -1414,6 +1549,11 @@ async function main(): Promise<void> {
     console.log("Building volcano catalogue…");
     volcanoes = await buildVolcanoes(plates);
     console.log(`  ${volcanoes.length} volcanoes`);
+  }
+
+  if (wanted("seafloor-age")) {
+    console.log("Building seafloor isochrons…");
+    await buildSeafloorAge(plates);
   }
 
   if (wanted("relief")) {

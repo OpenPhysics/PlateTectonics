@@ -52,6 +52,13 @@ export const VOLCANO_MARKER_SIZE = 3.4;
 /** Length in view pixels of a motion vector representing 100 mm/year. */
 export const VELOCITY_VECTOR_SCALE = 26;
 
+/**
+ * Line width of a seafloor isochron, in view pixels. Thinner than a plate boundary,
+ * because a hundred isochrons are drawn at once and they are a field to be read as a
+ * pattern rather than a symbol to be picked out one at a time.
+ */
+export const ISOCHRON_LINE_WIDTH = 1.1;
+
 // ── Globe rendering ───────────────────────────────────────────────────────────
 
 /**
@@ -91,6 +98,15 @@ export const CONTINENTAL_CRUST_THICKNESS_KM = 35;
 
 /** Typical thickness of oceanic crust, km. */
 export const OCEANIC_CRUST_THICKNESS_KM = 7;
+
+/**
+ * Oldest ocean floor left on Earth, in millions of years, and the top of the
+ * isochron colour ramp. Older crust than this has been subducted — the sea floor is
+ * recycled on a timescale a hundred times shorter than the continents, which is the
+ * whole reason an isochron map looks the way it does. A few patches in the eastern
+ * Mediterranean and off Florida are older still, and sit at the end of the ramp.
+ */
+export const MAX_SEAFLOOR_AGE_MA = 180;
 
 /** Typical thickness of the rigid lithosphere (crust + lithospheric mantle), km. */
 export const LITHOSPHERE_THICKNESS_KM = 100;
@@ -135,6 +151,7 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   QUAKE_RADIUS_PER_MAGNITUDE,
   VOLCANO_MARKER_SIZE,
   VELOCITY_VECTOR_SCALE,
+  ISOCHRON_LINE_WIDTH,
   GLOBE_RADIUS_MARGIN,
   GLOBE_INITIAL_CENTER_LON,
   GLOBE_INITIAL_CENTER_LAT,
@@ -145,6 +162,7 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   MAX_EARTHQUAKE_DEPTH_KM,
   CONTINENTAL_CRUST_THICKNESS_KM,
   OCEANIC_CRUST_THICKNESS_KM,
+  MAX_SEAFLOOR_AGE_MA,
   LITHOSPHERE_THICKNESS_KM,
   ASTHENOSPHERE_BASE_KM,
   TIME_RANGE_MYR,

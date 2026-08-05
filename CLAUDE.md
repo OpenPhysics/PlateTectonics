@@ -4,124 +4,138 @@ Sim-specific context for AI assistants. General SceneryStack guidance: [OpenPhys
 
 ## Project
 
-Reusable SceneryStack template (one or N screens) and **canonical accessibility reference** for
-OpenPhysics sims. Prefer `Baton/scripts/create-sim.sh` (or GitHub **Use this template** +
-`npm run rename` + `npm run scaffold-screens`) to fork it. For multi-screen sims, see
-[`doc/multi-screen.md`](doc/multi-screen.md).
+An interactive map of the Earth's tectonic plates, plus cross-sections through a
+subduction zone, a spreading ridge and a transform fault. **Everything on screen is
+real data** — plate model, earthquakes, volcanoes, elevation — so changes that affect
+what is drawn should be checked against [`doc/model.md`](doc/model.md), which records
+where each number comes from and what the model does not claim.
+
+Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTemplate).
 
 ## Key files
 
 | File | Purpose |
 |---|---|
-| `src/PlateTectonicsColors.ts` | All `ProfileColorProperty` instances |
-| `src/PlateTectonicsConstants.ts` | Named numeric constants (layout px, physics SI units) |
+| `src/PlateTectonicsColors.ts` | All `ProfileColorProperty` instances, including the plate palette |
+| `src/PlateTectonicsConstants.ts` | Layout px, Earth-science quantities, geological-time range |
 | `src/PlateTectonicsNamespace.ts` | Namespace for color property names |
 | `src/i18n/StringManager.ts` | Singleton localized string accessor |
-| `src/plate-tectonics/PlateTectonicsScreen.ts` | Screen wrapper |
-| `src/plate-tectonics/model/PlateTectonicsModel.ts` | Simulation state and logic |
-| `src/plate-tectonics/view/PlateTectonicsScreenView.ts` | Visual nodes, layout, `screenSummaryContent` + `pdomOrder` |
-| `src/plate-tectonics/view/PlateTectonicsScreenSummaryContent.ts` | Accessible screen summary (reference a11y pattern) |
-| `src/plate-tectonics/view/PlateTectonicsKeyboardHelpContent.ts` | Keyboard-help dialog content |
-| `src/common/PlateTectonicsPanel.ts` | Pre-themed `Panel` wrapper (uses `PlateTectonicsColors` automatically) |
-| `src/common/PlateTectonicsButtonOptions.ts` | Flat button-appearance option bundles + light-control-surface combo-box options |
-| `src/common/TimeModel.ts` | Composable play/pause + elapsed-time model for animated sims |
-| `scripts/generate-icons.ts` | PNG icons from `public/icons/icon.svg` |
-| `scripts/rename-sim.ts` | Sim-level fork/rename (package id + metadata, Colors, Constants, Panel, ButtonOptions, Preferences) |
-| `scripts/scaffold-screens.ts` | Emit N screen packages + wire main/strings/icons |
+| `src/common/MapProjection.ts` | Equirectangular lon/lat ↔ view |
+| `src/common/PlateReconstruction.ts` | Euler-pole rotation and plate velocities |
+| `src/common/data/dataTypes.ts` | Shapes of every dataset (hand-written) |
+| `src/common/data/hotspots.ts` | Hand-maintained hotspot list |
+| `src/common/data/generated/` | **Generated — do not edit.** `npm run build-data` owns it |
+| `src/plate-tectonics/model/PlateTectonicsModel.ts` | All AXON state |
+| `src/plate-tectonics/model/EarthquakeDepthFilter.ts` | Depth bands and the filter predicate |
+| `src/plate-tectonics/view/PlateTectonicsScreenView.ts` | Layout, view switching, `pdomOrder` |
+| `src/plate-tectonics/view/MapCanvasNode.ts` | The global map (canvas painting) |
+| `src/plate-tectonics/view/PlateOverlayNode.ts` | Plate labels + motion arrows |
+| `src/plate-tectonics/view/CrossSectionGeometry.ts` | Profile → view coords, slab fitting |
+| `src/plate-tectonics/view/CrossSectionCanvasNode.ts` | The painted cross-section |
+| `src/plate-tectonics/view/CrossSectionNode.ts` | Section + localized annotations |
+| `src/plate-tectonics/view/LegendSwatches.ts` | Map symbols, shared by legend and checkboxes |
+| `scripts/build-data.ts` | Fetches and reshapes every dataset |
+| `scripts/data/` | Fetch cache, GeoTIFF reader, geodesy, emitters |
+
+## Working on this sim
+
+### The generated data
+
+`src/common/data/generated/` is written by `npm run build-data` and committed, so
+normal builds are offline. Never hand-edit those files. To change what is in them,
+change `scripts/build-data.ts` and re-run it; downloads are cached under `.cache/data/`
+keyed by URL hash, so re-runs are fast and a changed query parameter re-fetches.
+
+`tests/geophysicalData.test.ts` guards the regeneration: it checks structural
+integrity and a few facts about the Earth (deep earthquakes cluster around the
+Pacific; the Chile profile's deep events sit inland of its shallow ones). Run
+`npm test` after any regeneration.
+
+### Rendering
+
+The map and the cross-sections are `CanvasNode`s, not trees of `Path`s, because every
+feature moves when the reconstruction clock runs — see the rationale in each file's
+header and in `doc/implementation-notes.md`. Text stays as Scenery `Text` so it can be
+localized and reached by a screen reader.
+
+Sphere-on-a-rectangle hazards (antimeridian wrapping, circumpolar rings, ring closure,
+coastlines tearing at plate boundaries) are all handled in
+`MapCanvasNode.appendPolyline`. Read its comments before touching it; each rule is
+there because of a specific artifact.
+
+### Colors
+
+Every color is a `ProfileColorProperty` in `PlateTectonicsColors.ts`, including the
+eight-entry `platePaletteColorProperties` used to tell neighbouring plates apart.
+Canvas painting reads them through `.value.toCSS()`, and the canvas nodes link the
+relevant properties so a Projector Mode switch repaints.
+
+Boundary colors (red / cyan / violet) and earthquake-depth colors (yellow → orange →
+magenta) have to stay mutually distinguishable *and* readable over the relief raster.
+Check both profiles after changing any of them.
 
 ## Common components
 
 ### PlateTectonicsPanel
 
-Every control panel and info box in the sim should use `PlateTectonicsPanel` so that
-default/projector color switching is automatic:
+Every control panel and info box uses `PlateTectonicsPanel` so default/projector color
+switching is automatic:
 
 ```typescript
 import { PlateTectonicsPanel } from "../../common/PlateTectonicsPanel.js";
-const panel = new PlateTectonicsPanel(content);              // uses PlateTectonicsColors defaults
-const panel = new PlateTectonicsPanel(content, { xMargin: 20 }); // override any PanelOption
+const panel = new PlateTectonicsPanel(content, { minWidth: CONTROL_PANEL_WIDTH });
 ```
-
-### TimeModel
-
-For simulations with animation, compose `TimeModel` into your screen model:
-
-```typescript
-import { TimeModel } from "../../common/TimeModel.js";
-
-export class MyModel implements TModel {
-  public readonly timer = new TimeModel();   // starts paused; pass true to auto-play
-
-  public step(dt: number): void {
-    this.timer.step(dt);
-    // use this.timer.timeProperty.value for physics
-  }
-  public reset(): void { this.timer.reset(); /* … */ }
-}
-```
-
-Wire the view to `TimeControlNode` from `scenerystack/scenery-phet` binding on
-`model.timer.isPlayingProperty`.
 
 ### PlateTectonicsButtonOptions
 
-SceneryStack's push/round buttons default to a 3-D/beveled look; every button in the sim
-should be flat instead. Spread these into the relevant options object:
+SceneryStack's push/round buttons default to a 3-D look; every button here is flat.
+Spread `FLAT_RESET_ALL_BUTTON_OPTIONS`, `FLAT_RECTANGULAR_BUTTON_OPTIONS` or
+`FLAT_PLAY_PAUSE_STEP_BUTTON_OPTIONS` into the relevant options object, and use
+`PLATE_TECTONICS_COMBO_BOX_OPTIONS` + `LIGHT_SURFACE_TEXT_FILL` for combo boxes.
+Anything drawn on a light control surface (checkbox ticks, combo items) must use
+`controlSurfaceTextColorProperty`, not `textColorProperty`.
 
-```typescript
-import { FLAT_RESET_ALL_BUTTON_OPTIONS, FLAT_RECTANGULAR_BUTTON_OPTIONS } from "../../common/PlateTectonicsButtonOptions.js";
+### TimeModel
 
-const resetAllButton = new ResetAllButton({ ...FLAT_RESET_ALL_BUTTON_OPTIONS, listener: () => {...} });
-const exampleButton = new RectangularPushButton({ ...FLAT_RECTANGULAR_BUTTON_OPTIONS, content, listener });
-```
-
-`FLAT_PLAY_PAUSE_STEP_BUTTON_OPTIONS` spreads into `TimeControlNode`'s `playPauseStepButtonOptions`;
-`TIME_CONTROL_SPEED_RADIO_OPTIONS` fixes `TimeControlNode`'s speed-radio label color, which
-otherwise defaults to black text on the sim's dark default-mode panels. `PLATE_TECTONICS_COMBO_BOX_OPTIONS`
-themes a `ComboBox`'s button/list chrome to the light control surface below; pair item labels
-with `LIGHT_SURFACE_TEXT_FILL` (not `PlateTectonicsColors.textColorProperty`, which is for panel-fill text).
-
-`PlateTectonicsColors.ts` backs this with a "light control surfaces" section —
-`controlSurfaceColorProperty`, `controlSurfaceDisabledColorProperty`,
-`controlSurfaceTextColorProperty` — identical white/dark-text values in both default and
-projector profiles, so any component that must stay light regardless of theme (combo boxes,
-flat buttons, editable fields) keeps readable contrast automatically.
+`PlateTectonicsModel` composes `TimeModel` for play/pause and elapsed wall-clock time.
+The elapsed time drives cross-section flow animation; the *reconstruction* clock is a
+separate `timeMillionsOfYearsProperty`, advanced in `step()` at
+`millionYearsPerSecond` and clamped to ±50 Myr.
 
 ## Accessibility
 
-This template is the **canonical accessibility reference** for OpenPhysics sims. It ships with
-the three required layers wired up: PDOM names, a `PlateTectonicsScreenSummaryContent`, and an explicit
-`pdomOrder` + `PlateTectonicsKeyboardHelpContent`. A11y strings live under the `a11y` key in each locale
-JSON, exposed via `StringManager.getPlateTectonicsA11yStrings()`. When building a real sim, make
-`currentDetailsContent` a live `DerivedProperty` over model state and add `accessibleName`s to
-every interactive node. Full convention and checklist: [Baton/ACCESSIBILITY.md](https://github.com/OpenPhysics/Baton/blob/main/ACCESSIBILITY.md).
+The three required layers are wired up:
+
+- `PlateTectonicsScreenSummaryContent` builds a **live** `currentDetails` paragraph
+  from the model — view, layers, depth filter, geological time.
+- Every control has an `accessibleName` from the `a11y` string group; several have
+  `accessibleHelpText`.
+- `PlateTectonicsScreenView` sets an explicit `pdomOrder` ending at Reset All, and
+  `PlateTectonicsKeyboardHelpContent` documents sliders, the combo box and basic actions.
+
+A11y strings live under `a11y.plateTectonics` in each locale JSON, exposed via
+`StringManager.getPlateTectonicsA11yStrings()`. Full checklist:
+[Baton/ACCESSIBILITY.md](https://github.com/OpenPhysics/Baton/blob/main/ACCESSIBILITY.md).
 
 ## Compliance carve-outs
 
-A clean fork of this template rarely needs compliance carve-outs — root `PlateTectonicsConstants.ts`,
-`*Colors.ts`, `*Namespace.ts`, standard screen layout, and full a11y wiring pass Baton's
-compliance check out of the box. Document carve-outs in the forked sim's `CLAUDE.md` only when
-you introduce a deliberate deviation (nested constants, hardcoded interaction fills, etc.).
+- **Generated data is excluded from Biome** (`biome.json` → `files.includes`). Those
+  files are machine-formatted by `scripts/data/emit.ts` to keep numeric arrays compact.
+- **Canvas painting instead of Scenery nodes** for the map and cross-sections, for the
+  performance reason above. The interactive controls are all standard sun components.
 
 ## Testing
 
-Fleet-standard Vitest layout (keep when forking):
-
 | Path | Purpose |
 |---|---|
-| `vitest.config.ts` | `happy-dom` environment; `setupFiles: ["./tests/setup.ts"]`; `execArgv: ["--expose-gc"]` |
-| `tests/setup.ts` | Canvas / AudioContext mocks + `init({ name: "…" })` before SceneryStack imports |
-| `tests/TimeModel.test.ts` | Sample model unit tests — replace with real physics tests |
-| `tests/memory-leak.test.ts` | WeakRef + `forceGC` dispose regression (fleet pattern) |
-| `tests/fuzz/fuzz.spec.ts` | Optional Playwright fuzz smoke via joist `?fuzz` |
-| `playwright.config.ts` | Chromium project + Vite webServer for fuzz |
+| `tests/PlateReconstruction.test.ts` | Euler-pole rotation; plate speeds against published values |
+| `tests/PlateTectonicsModel.test.ts` | Layer state, depth bands, time clock, reset |
+| `tests/CrossSectionGeometry.test.ts` | Two-band layout, crust switching, slab fitting, ridge cooling |
+| `tests/MapProjection.test.ts` | Projection round trips, 2:1 viewport |
+| `tests/geophysicalData.test.ts` | Integrity of the generated datasets |
+| `tests/memory-leak.test.ts` | WeakRef + `forceGC` dispose regression |
 
-- Put unit tests only under root `tests/`, mirroring `src/` (never co-locate or use `__tests__/`).
-- Change the `name` passed to `init()` in `tests/setup.ts` to match `package.json` after `npm run rename`.
-- Run `npm test`. CI runs the suite when a `test` script is present.
-- Expand `memory-leak.test.ts` for any component that adds/removes nodes or links Properties at
-  runtime (see OpticsLab for a deep suite).
-- Optional: `npm run test:fuzz` / `test:fuzz:quick` (not part of default CI).
+Unit tests live only under root `tests/`, mirroring `src/`.
 
 ## Commands
 
@@ -134,72 +148,15 @@ npm run lint && npm run check && npm run build && npm test
 | `npm start` / `npm run dev` | Vite dev server |
 | `npm run build` | Type-check + production build |
 | `npm run build:single` | Single-file build mode |
-| `npm run check` | TypeScript (`tsc --noEmit` + scripts project) |
+| `npm run build-data` | Regenerate every dataset from its public source (uses the network) |
+| `npm run check` | TypeScript (`tsc --noEmit` + scripts + tests projects) |
 | `npm run lint` / `npm run fix` | Biome check / auto-fix |
 | `npm test` | Vitest unit tests |
-| `npm run test:fuzz` | Playwright fuzz smoke |
-| `npm run test:fuzz:quick` | 10s fuzz |
-| `npm run icons` | Regenerate PWA icons |
-| `npm run rename` | Sim-level fork/rename (`--id`, `--name`) |
-| `npm run scaffold-screens` | Emit N screens (`--screens Intro,Lab`) |
-
-## Customizing a new sim from this template
-
-### Recommended: Baton create-sim
-
-```sh
-Baton/scripts/create-sim.sh --repo Friction --name "Friction" --screens Intro,Lab --shared-model --onboard
-```
-
-### Manual: GitHub template + rename + scaffold
-
-```sh
-npm install
-npm run rename -- --id friction --name "Friction"
-npm run scaffold-screens -- --screens Intro,Lab --shared-model
-# omit --screens for one screen named after the sim; omit --shared-model for independent models
-npm run fix     # required: both scripts reorder imports, which Biome then sorts
-npm run check
-```
-
-`rename` updates package id and metadata, display name, and every sim-level `Sim*`
-(Colors, Constants, Namespace, Panel, ButtonOptions, Preferences, query parameters).
-`scaffold-screens` owns screen folders (fleet naming: `src/intro/`, not `intro-screen/`).
-After both steps no `Sim*` identifier should remain — `grep -rn '\bSim[A-Z_]' src` to confirm.
-
-### Manual checklist (if not using the scripts)
-
-1. **Rename** — replace `plate-tectonics` / `Plate Tectonics` / `Sim` prefix in `init.ts`, `brand.ts`, `package.json` (name, description, keywords, repository.url), Colors/Constants/Namespace/Panel/ButtonOptions/Preferences
-2. **Screens** — run `scaffold-screens` or mirror `plate-tectonics/` into kebab folders
-3. **Locale** — add `strings_XX.json`, register in `StringManager`, add locale to `init.ts` `availableLocales`
-4. **Icon** — edit `public/icons/icon.svg`, run `npm run icons`; match theme color in `index.html` / `vite.config.ts`
-5. **Colors** — edit `*Colors.ts` (`default` + `projector` profiles per property)
-
-## Multi-screen sims
-
-Full guide: [`doc/multi-screen.md`](doc/multi-screen.md)
-
-Summary:
-- Prefer `npm run scaffold-screens -- --screens Intro,Lab` (add `--shared-model` for a root model)
-- Or create a screen folder mirroring `src/plate-tectonics/` for each screen (kebab names, no `-screen` suffix)
-- Add screen-name keys to all locale JSON files; nest `a11y` per screen
-- Expose new getters in `StringManager.getScreenNames()` / `get{Screen}A11yStrings()`
-- Shared state: `--shared-model` → `common/model/SharedModel.ts` composed per screen (rename to a domain type)
-- Add `src/common/PlateTectonicsScreenIcons.ts` with `create{Screen}Icon()` factories; wire `homeScreenIcon` + `navigationBarIcon` on each Screen
-- Register all screens in the `screens` array in `main.ts`
-
-## Using this template beyond a direct copy
-
-| Approach | When to use |
-|---|---|
-| **`Baton/scripts/create-sim.sh`** | Agents / fleet — create repo, rename, scaffold N screens |
-| **GitHub template** ("Use this template") | Humans starting a sim in the browser |
-| `npm run rename` + `scaffold-screens` | Same, after cloning the template |
-| **npm workspace / monorepo** | Managing a suite of sims with shared tooling |
-| **git subtree** for pulling updates | Keeping forks in sync with template improvements |
-
-See `doc/multi-screen.md` → "Using this template beyond a direct copy" for details.
+| `npm run test:fuzz` / `test:fuzz:quick` | Playwright fuzz smoke |
+| `npm run icons` | Regenerate PWA icons from `public/icons/icon.svg` |
 
 ## PWA
 
-After `npm run build`, the sim is installable offline via Workbox (`dist/manifest.webmanifest`).
+After `npm run build`, the sim is installable offline via Workbox
+(`dist/manifest.webmanifest`). The relief raster is a build-time asset, so the offline
+sim is complete.

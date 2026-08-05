@@ -62,12 +62,18 @@ onReadyToLaunch(() => {
       },
     }),
 
-    // Optional: fill in credits shown in Help → About
+    // Shown in Help → About. The data sources are credited here as well as on
+    // screen, because two of them ask for attribution and all of them deserve it.
     credits: {
-      leadDesign: "",
-      softwareDevelopment: "",
-      team: "",
+      leadDesign: "OpenPhysics",
+      softwareDevelopment: "OpenPhysics",
+      team: "OpenPhysics",
       qualityAssurance: "",
+      graphicArts: "",
+      thanks:
+        "Plate model: Bird (2003), doi:10.1029/2001GC000252, via fraxen/tectonicplates (ODC-BY 1.0). " +
+        "Coastlines: Natural Earth. Earthquakes: USGS ANSS. Volcanoes: NOAA NCEI / Smithsonian GVP. " +
+        "Elevation and bathymetry: NOAA NCEI.",
     },
   });
 

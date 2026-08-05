@@ -1,135 +1,142 @@
-# Implementation Notes - Plate Tectonics
+# Implementation Notes — Plate Tectonics
 
-Developer-facing notes on the **SceneryStackTemplate** scaffold. **Replace and expand this file when
-forking** to describe your sim's real architecture (see Stern Gerlach or Light Propagation for
-target quality). Until then, this documents what the template provides out of the box.
+Developer-facing notes. Companion to [model.md](./model.md), which explains the
+science.
 
-## Architecture Overview
-
-SceneryStackTemplate is the fleet-canonical starting point for new SceneryStack sims (one or N screens).
-It demonstrates Model–View separation, color profiles, localization, reset behavior, accessibility
-reference wiring, and reusable common components — **without** domain physics.
+## Architecture
 
 ```
-main.ts
-  └─ PlateTectonicsScreen             (Screen<PlateTectonicsModel, PlateTectonicsScreenView>)
-       ├─ PlateTectonicsModel          state + logic  (src/plate-tectonics/model/)  ← stub: add physics here
-       └─ PlateTectonicsScreenView     visuals        (src/plate-tectonics/view/)
-            ├─ PlateTectonicsScreenSummaryContent     (PDOM overview — reference a11y pattern)
-            └─ PlateTectonicsKeyboardHelpContent      (keyboard help dialog)
-
-src/common/
-  ├─ PlateTectonicsPanel.ts           pre-themed panel (uses PlateTectonicsColors)
-  ├─ PlateTectonicsButtonOptions.ts   flat button / combo-box option bundles
-  └─ TimeModel.ts          composable play/pause + elapsed time
-
-src/preferences/
-  ├─ PlateTectonicsPreferencesModel   sim-specific pref state
-  ├─ PlateTectonicsPreferencesNode    pref UI in Preferences → Simulation
-  └─ plateTectonicsQueryParameters    QueryStringMachine declarations
+src/
+  PlateTectonicsColors.ts        every ProfileColorProperty (default + projector)
+  PlateTectonicsConstants.ts     layout px, Earth-science quantities, time range
+  common/
+    MapProjection.ts             equirectangular lon/lat ↔ view
+    PlateReconstruction.ts       Euler-pole rotation and plate velocities
+    data/
+      dataTypes.ts               shapes of every dataset (hand-written)
+      hotspots.ts                hand-maintained hotspot list
+      generated/                 npm run build-data writes these — do not edit
+  plate-tectonics/
+    model/
+      PlateTectonicsModel.ts     all AXON state
+      EarthquakeDepthFilter.ts   depth bands and the filter predicate
+    view/
+      PlateTectonicsScreenView.ts  layout, view switching, relief loading, pdomOrder
+      MapCanvasNode.ts             the global map (canvas)
+      PlateOverlayNode.ts          plate labels and motion arrows (Scenery nodes)
+      CrossSectionNode.ts          a section: canvas + localized annotations
+      CrossSectionCanvasNode.ts    the painted section
+      CrossSectionGeometry.ts      profile → view coordinates, slab fitting
+      LayerControlPanel.ts         layer checkboxes + depth filter
+      ViewControlPanel.ts          view combo box
+      TimeControlPanel.ts          time slider, play/pause, speed
+      MapLegendNode.ts             legend strip + data credit
+      LegendSwatches.ts            the symbols, shared by legend and checkboxes
+scripts/
+  build-data.ts                  fetches and reshapes every dataset
+  data/                          fetch cache, GeoTIFF reader, geodesy, emitters
 ```
 
-Data flows Model → View through AXON `Property` objects (`.link()` / `.lazyLink()`). The view never
-integrates physics; the model never imports scenery.
+## Why the map is a canvas
 
-## Forking checklist
+The map draws roughly 8 800 earthquakes, 1 600 volcanoes, 1 580 boundary segments and
+several thousand outline vertices — and *every one of them moves* when the
+reconstruction clock runs, because each vertex is rotated about its plate's Euler
+pole. Rebuilding that many Kite `Shape`s per frame does not keep up, so `MapCanvasNode`
+is a `CanvasNode` that paints them directly. It repaints only when something it
+depends on changes: a layer toggle, the depth filter, the reconstruction time, or a
+colour-profile switch.
 
-### Automated rename + scaffold (recommended)
+Things that are few and need crisp text stay ordinary Scenery nodes: the sixteen plate
+labels and motion arrows (`PlateOverlayNode`), and every cross-section annotation
+(`CrossSectionNode`) — which also keeps them localized and reachable.
 
-```sh
-npm run rename -- --id my-sim --name "My Simulation"
-npm run scaffold-screens -- --screens Intro,Lab   # or omit --screens for one screen
-npm run check
-```
+`PlateReconstruction.transform` writes its result into public scratch fields rather
+than returning an object, because it is called tens of thousands of times per frame
+and allocating there would dominate the frame budget. At the present day it is the
+identity and returns immediately, which is the common case.
 
-Or from the workspace: `Baton/scripts/create-sim.sh --repo MySim --name "My Simulation"`.
+## Drawing a sphere on a rectangle
 
-`scripts/rename-sim.ts` updates sim-level identifiers (package id, Colors, Preferences).
-`scripts/scaffold-screens.ts` emits fleet-named screen folders and wires main/strings/icons.
+Three problems come out of the projection, all handled in `MapCanvasNode.appendPolyline`:
 
-### Manual steps (after rename/scaffold or if skipping the scripts)
+1. **The antimeridian.** Longitudes are unwrapped as a polyline is walked — each
+   vertex is nudged by whole turns to stay within half a turn of the previous one — so
+   a feature that straddles ±180° stays in one piece. The ring is then repeated a
+   world-width either side, and the clip keeps whichever copy is on screen.
+2. **Circumpolar rings.** The North American plate reaches right around the Arctic and
+   the Antarctic plate around the South Pole, so their rings gain a whole turn of
+   longitude. Filling one has to route over the pole it encloses, or the fill spills
+   across the map.
+3. **Closing.** Every ring in the data repeats its first vertex at the end, so outlines
+   are already closed and `closePath` is only used for fills — which is just as well,
+   because on an unwrapped ring `closePath` would draw a chord straight across the map.
 
-1. **`doc/model.md`** — educator physics (equations, ranges, simplifications).
-2. **`doc/implementation-notes.md`** — this file, rewritten for your architecture.
-3. **Screen model(s)** — real Properties, `step(dt)`, `reset()`; compose `TimeModel` if animated.
-4. **Screen view(s)** — play area + controls; wire `ResetAllButton` to `model.reset()`.
-5. **`*Colors.ts`** — sim palette (default + projector profiles).
-6. **Locale JSON** — title, strings, `a11y` keys; register locales in `init.ts`.
-7. **`public/icons/icon.svg`** → `npm run icons`; align theme color in `index.html` / vite config.
-8. **`tests/setup.ts`** — `init({ name: … })` must match `package.json` name after rename.
-9. **`CLAUDE.md`** — sim-specific file map and pitfalls for AI assistants.
+Coastline vertices carry a *per-vertex* plate index, so a coastline that straddles a
+boundary tears apart correctly under reconstruction — Baja California rides the Pacific
+plate away from North America. The outline is broken at those tears (the fill still
+spans them) so the torn edge does not leave a stray line across the ocean.
 
-## Common components (keep when forking)
+## The data pipeline
 
-### PlateTectonicsPanel
+`npm run build-data` is the only thing that touches the network. It writes
+`src/common/data/generated/`, which is committed, so an ordinary `npm run build` is
+offline. Downloads are cached under `.cache/data/` (git-ignored) keyed by a hash of
+the URL, so changing a query parameter re-fetches instead of silently reusing the old
+response.
 
-Every control panel should use `PlateTectonicsPanel` so projector-mode switching is automatic:
+Notable pieces:
 
-```typescript
-import { PlateTectonicsPanel } from "../../common/PlateTectonicsPanel.js";
-const panel = new PlateTectonicsPanel(content);
-const panelWide = new PlateTectonicsPanel(content, { xMargin: 20 });
-```
+- `scripts/data/dem.ts` contains a ~120-line GeoTIFF reader. NOAA's image service
+  returns an uncompressed, tiled, signed-16-bit TIFF, which is little enough format to
+  parse directly and saves a dependency.
+- Boundary segments are rebuilt from PB2002's *step* file rather than its boundary
+  file, because only the steps carry the class (`OSR`, `SUB`, `CTF`, …) that the
+  divergent / convergent / transform colouring needs.
+- The relief PNG is rendered at build time from the DEM with a bathymetric-to-alpine
+  colour ramp plus a north-west illumination, and a light ice mask over high polar
+  ground so Greenland and Antarctica read as ice rather than as mountains.
 
-### TimeModel
+Generated files are excluded from Biome (see `biome.json`) and formatted by
+`scripts/data/emit.ts` instead, which keeps the numeric arrays compact.
 
-Compose into your screen model for animation (do not subclass `TimeModel`):
+## Accessibility
 
-```typescript
-export class MyModel implements TModel {
-  public readonly timer = new TimeModel();  // pass true to auto-play on startup
+- `PlateTectonicsScreenSummaryContent` derives its *current details* paragraph from the
+  model, so a screen-reader user hears which view is showing, which layers are drawn,
+  which depths pass the filter, and where in geological time the plates are.
+- Every control carries an `accessibleName` (and a help text where it earns one) from
+  the `a11y` string group.
+- `PlateTectonicsScreenView` sets an explicit `pdomOrder`: view selector → layer
+  checkboxes → depth filter → time slider → time controls → Reset All.
+- The keyboard-help dialog has a section per interaction kind: slider, combo box, and
+  basic actions.
 
-  public step(dt: number): void {
-    this.timer.step(dt);
-    // physics uses this.timer.timeProperty.value
-  }
-  public reset(): void { this.timer.reset(); /* restore initial state */ }
-}
-```
+## Testing
 
-Wire `TimeControlNode` to `model.timer.isPlayingProperty` in the view.
+`npm test` runs Vitest over `tests/`:
 
-### PlateTectonicsButtonOptions
-
-Spread flat button options into every push/round button and `TimeControlNode` (see `CLAUDE.md`).
-Use `PLATE_TECTONICS_COMBO_BOX_OPTIONS` + `LIGHT_SURFACE_TEXT_FILL` for light control surfaces on dark panels.
-
-## Accessibility (reference implementation)
-
-The template is the **canonical OpenPhysics a11y reference**:
-
-- PDOM `accessibleName` on interactive nodes (prefer live `StringProperty`s).
-- `PlateTectonicsScreenSummaryContent` with a live `currentDetailsContent` `DerivedProperty` over model state.
-- Explicit `pdomOrder` + `PlateTectonicsKeyboardHelpContent`.
-- Strings under `a11y` in locale JSON → `StringManager.getPlateTectonicsA11yStrings()`.
-
-Full checklist: [Baton/ACCESSIBILITY.md](https://github.com/OpenPhysics/Baton/blob/main/ACCESSIBILITY.md).
-
-## Testing (fleet layout — keep when forking)
-
-| Path | Purpose |
+| File | Covers |
 |---|---|
-| `vitest.config.ts` | `happy-dom`; `setupFiles: ["./tests/setup.ts"]`; `execArgv: ["--expose-gc"]` |
-| `tests/setup.ts` | Canvas/AudioContext mocks + `init()` before SceneryStack imports |
-| `tests/TimeModel.test.ts` | **Replace** with real model/physics tests mirroring `src/` |
-| `tests/memory-leak.test.ts` | WeakRef + `forceGC` dispose regression |
-| `tests/fuzz/fuzz.spec.ts` | Optional Playwright smoke via `?fuzz` |
+| `PlateReconstruction.test.ts` | Euler-pole rotation, round trips, and plate speeds against published values |
+| `PlateTectonicsModel.test.ts` | layer state, depth bands, the time clock and reset |
+| `CrossSectionGeometry.test.ts` | the two-band layout, crust switching, slab fitting, ridge cooling |
+| `MapProjection.test.ts` | projection round trips and the 2:1 viewport |
+| `geophysicalData.test.ts` | integrity of every generated dataset, plus a few facts about the Earth |
+| `memory-leak.test.ts` | WeakRef + forced GC on disposables |
 
-Run `npm test`. Expand `memory-leak.test.ts` when adding runtime-created nodes or Property links.
+`geophysicalData.test.ts` is the guard on `npm run build-data`: it fails if a
+regeneration returns something mangled, and it checks that deep earthquakes still
+cluster around the Pacific, which no amount of reshaping should change.
 
-## Multi-screen simulations
+## Adding a cross-section
 
-Default is single-screen. To add screens, see **`doc/multi-screen.md`**: per-screen folders mirroring
-`src/plate-tectonics/`, `StringManager` screen-name getters, optional shared root model, a shared
-`src/common/PlateTectonicsScreenIcons.ts` module (`create{Screen}Icon()` factories wired as
-`homeScreenIcon` / `navigationBarIcon`), and register all screens in `main.ts`.
+1. Add an entry to `SECTIONS` in `scripts/build-data.ts` (profile end points, corridor
+   half-width, depth range, minimum magnitude).
+2. Extend `ViewKey` in `src/common/data/dataTypes.ts`.
+3. Add the view name and its a11y description to every locale JSON, and an item to
+   `ViewControlPanel`.
+4. Run `npm run build-data`.
 
-## PWA
-
-After `npm run build`, the sim is installable offline via Workbox (`dist/manifest.webmanifest`).
-
-## Known template stubs (remove when forking)
-
-- `PlateTectonicsModel.step()` / `reset()` — empty placeholders until you add physics.
-- Placeholder play-area content in `PlateTectonicsScreenView` — replace with real UI.
-- `tests/TimeModel.test.ts` — sample only; add tests for your model under `tests/`.
+The section renders itself from there: the surface comes from the DEM, the seismicity
+from USGS, and the slab from the seismicity.

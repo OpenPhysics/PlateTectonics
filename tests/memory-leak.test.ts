@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { PlateReconstruction } from "../src/common/PlateReconstruction.js";
 import { TimeModel } from "../src/common/TimeModel.js";
 
 /**
@@ -35,6 +36,17 @@ function createAndDisposeTimeModel(): WeakRef<object> {
   return ref;
 }
 
+/**
+ * One reconstruction holds a matrix per plate; scrubbing geological time creates and
+ * discards them, so a leak here would grow with every drag of the time slider.
+ */
+function createAndDropReconstruction(): WeakRef<object> {
+  const reconstruction = new PlateReconstruction();
+  reconstruction.setTime(-25);
+  reconstruction.transform(-71.5, -21.5, 0);
+  return new WeakRef<object>(reconstruction);
+}
+
 describe("Memory leak regression", () => {
   it("global.gc is available (--expose-gc)", () => {
     expect(globalThis.gc).toBeDefined();
@@ -56,6 +68,21 @@ describe("Memory leak regression", () => {
     const model = new TimeModel();
     model.dispose();
     expect(() => model.dispose()).not.toThrow();
+  });
+
+  it("PlateReconstruction is collected once dropped", async () => {
+    const ref = createAndDropReconstruction();
+    await forceGC(ref);
+    expect(ref.deref()).toBeUndefined();
+  });
+
+  it("repeated reconstructions leave no survivors", async () => {
+    const refs: WeakRef<object>[] = [];
+    for (let i = 0; i < 10; i++) {
+      refs.push(createAndDropReconstruction());
+    }
+    await forceGC();
+    expect(refs.filter((ref) => ref.deref() !== undefined).length).toBe(0);
   });
 
   it("repeated create/dispose cycles leave no survivors", async () => {

@@ -155,9 +155,9 @@ export default defineConfig(({ mode }) => {
               name: "Plate Tectonics",
               // biome-ignore lint/style/useNamingConvention: Web App Manifest spec requires snake_case keys
               short_name: "PlateTectonics",
-              description: "A SceneryStack simulation: Plate Tectonics",
+              description: "Explore Earth's tectonic plates: boundaries, motion, earthquakes and volcanoes.",
               // biome-ignore lint/style/useNamingConvention: Web App Manifest spec requires snake_case keys
-              theme_color: "#1a1a2e",
+              theme_color: "#12182b",
               // biome-ignore lint/style/useNamingConvention: Web App Manifest spec requires snake_case keys
               background_color: "#000000",
               display: "standalone",

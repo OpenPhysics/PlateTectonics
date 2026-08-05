@@ -36,6 +36,12 @@ const SWATCH_HEIGHT = 12;
 /** Opacity of the plate-palette blocks in the "tectonic plates" swatch. */
 const PLATE_SWATCH_OPACITY = 0.75;
 
+/**
+ * Where each {@link PlateTectonicsColors.reliefRampColorProperties} stop sits along
+ * the topography swatch; one ratio per color, in the same order.
+ */
+const RELIEF_RAMP_STOPS = [0, 0.45, 0.6, 0.85, 1];
+
 /** Builds the icon for one symbol, centred on its own origin-free bounds. */
 export function createLegendSwatch(kind: SwatchKind): Node {
   switch (kind) {
@@ -105,14 +111,14 @@ export function createLegendSwatch(kind: SwatchKind): Node {
       return hotspotDiamond(0);
 
     case "topography":
-      // A slice of the relief ramp: deep ocean through shelf to high ground.
+      // A slice of the relief ramp: deep ocean through shelf to high ground. The
+      // stops are bunched past the middle because most of the Earth's surface is
+      // below sea level, so an evenly spaced ramp would read as almost all ocean.
       return new Rectangle(0, 0, SWATCH_WIDTH, SWATCH_HEIGHT, {
-        fill: new LinearGradient(0, 0, SWATCH_WIDTH, 0)
-          .addColorStop(0, "#0d2a5c")
-          .addColorStop(0.45, "#3c7fbe")
-          .addColorStop(0.6, "#5a8256")
-          .addColorStop(0.85, "#b08a5c")
-          .addColorStop(1, "#efefef"),
+        fill: PlateTectonicsColors.reliefRampColorProperties.reduce(
+          (gradient, color, index) => gradient.addColorStop(RELIEF_RAMP_STOPS[index] as number, color),
+          new LinearGradient(0, 0, SWATCH_WIDTH, 0),
+        ),
         cornerRadius: 2,
       });
 

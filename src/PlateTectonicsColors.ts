@@ -82,6 +82,39 @@ const PlateTectonicsColors = {
   }),
 
   /**
+   * Stops of the elevation ramp shown in the topography swatch, sampled from the
+   * shaded relief raster: abyssal plain → shelf → lowland → upland → ice and peak.
+   *
+   * These are the one group whose `projector` values match their `default` ones.
+   * The raster is a fixed build-time image that Projector Mode cannot repaint, so
+   * a swatch that claims to be a slice of it has to stay the same colour too —
+   * they are ProfileColorProperties so the ramp is declared here with every other
+   * color rather than inlined at the point of use.
+   */
+  reliefRampColorProperties: [
+    new ProfileColorProperty(PlateTectonicsNamespace, "reliefDeepOcean", {
+      default: "#0d2a5c",
+      projector: "#0d2a5c",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "reliefShelf", {
+      default: "#3c7fbe",
+      projector: "#3c7fbe",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "reliefLowland", {
+      default: "#5a8256",
+      projector: "#5a8256",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "reliefUpland", {
+      default: "#b08a5c",
+      projector: "#b08a5c",
+    }),
+    new ProfileColorProperty(PlateTectonicsNamespace, "reliefPeak", {
+      default: "#efefef",
+      projector: "#efefef",
+    }),
+  ],
+
+  /**
    * Wash colors used to tell neighbouring plates apart. Plate *i* uses entry
    * *i* mod `platePaletteColorProperties.length`; the palette is longer than the
    * number of large plates that are visible at once, so neighbours rarely repeat.

@@ -10,7 +10,8 @@
     "divergent": "Spreading ridge — Mid-Atlantic",
     "transform": "Transform fault — San Andreas",
     "globe": "Show as 3-D globe",
-    "globeHint": "Drag the globe to turn the Earth"
+    "globeHint": "Drag the globe to turn the Earth",
+    "mapHint": "Drag the map to move it east and west; zoom in for a closer look"
   },
   "layers": {
     "title": "Layers",
@@ -75,7 +76,7 @@
       },
       "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
       "viewDetails": {
-        "global": "The global map is showing.",
+        "global": "The global map is showing. It can be moved east and west, and zoomed in to look at one region closely.",
         "globe": "The Earth is showing as a globe, which can be turned to bring any part of it into view.",
         "subduction": "A cross-section through the Chile trench is showing, where the Nazca plate subducts beneath South America.",
         "divergent": "A cross-section through the Mid-Atlantic Ridge is showing, where North America and Africa spread apart.",
@@ -101,6 +102,11 @@
         "globeToggleHelp": "Draw the global map on a globe that can be turned, instead of a flat rectangular map.",
         "globe": "Globe",
         "globeHelp": "Drag the globe to turn the Earth. With the globe focused, the left and right arrow keys move the view east and west, and the up and down arrow keys move it north and south.",
+        "map": "Map",
+        "mapHelp": "Drag the map to move it. With the map focused, the left and right arrow keys move the view east and west; once the map is zoomed in, the up and down arrow keys move it north and south.",
+        "zoomIn": "Zoom in on the map",
+        "zoomOut": "Zoom out from the map",
+        "zoomHelp": "Zoom in to look at one region closely, or out to bring the whole world back.",
         "plates": "Tectonic plates",
         "plateBoundaries": "Plate boundaries",
         "motionVectors": "Motion vectors",

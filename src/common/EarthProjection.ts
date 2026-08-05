@@ -16,12 +16,21 @@
  *     context.lineTo(projection.x, projection.y);
  *   }
  *
- * The boolean is what separates a sphere from a rectangle: on the flat map every
- * point is on screen, while on the globe half the world faces away from the viewer.
+ * The boolean is what separates one view from the other: on the globe half the world
+ * faces away from the viewer, while on the flat map every point is on the map but
+ * only the part the camera is over is inside the viewport.
  */
 
 import type { TReadOnlyProperty } from "scenerystack/axon";
 import type { Bounds2 } from "scenerystack/dot";
+
+/**
+ * Wraps a longitude into [-180, 180), so a camera longitude stays bounded however far
+ * the Earth is spun or panned. Shared by both projections, which each carry one.
+ */
+export function wrapLongitude(lon: number): number {
+  return ((((lon + 180) % 360) + 360) % 360) - 180;
+}
 
 export interface EarthProjection {
   /** The rectangle the projection draws inside. */
@@ -47,8 +56,9 @@ export interface EarthProjection {
 
   /**
    * Projects a geographic point, writing view coordinates to {@link x} and {@link y}.
-   * Returns false when the point faces away from the viewer, in which case the
-   * coordinates are still written but must not be drawn.
+   * Returns false when the point is not on screen — it faces away from the viewer on
+   * the globe, or lies outside the viewport on a panned or zoomed flat map — in which
+   * case the coordinates are still written but must not be drawn.
    */
   project(lon: number, lat: number): boolean;
 

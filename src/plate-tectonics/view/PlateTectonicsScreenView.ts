@@ -17,18 +17,27 @@
  * The flat map, the globe and the cross-section share one viewport; the view selector
  * and the globe checkbox decide which of the three is visible. The relief raster is
  * fetched here, once, and handed to both map canvases when it has decoded.
+ *
+ * Both global views can be moved: the globe turns, and the flat map pans and zooms.
+ * Their cameras live here in the view rather than in the model, because a camera is
+ * a way of looking at the Earth rather than a fact about it — which is why Reset All
+ * puts both of them back through {@link PlateTectonicsScreenView.reset}.
  */
 
 import { Shape } from "scenerystack/kite";
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
 import { Circle, Node, Rectangle, Text } from "scenerystack/scenery";
-import { PhetFont, ResetAllButton } from "scenerystack/scenery-phet";
+import { PhetFont, PlusMinusZoomButtonGroup, ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import { attachGlobeRotation } from "../../common/attachGlobeRotation.js";
+import { attachMapNavigation } from "../../common/attachMapNavigation.js";
 import reliefImageUrl from "../../common/data/generated/relief.png";
 import { GlobeProjection } from "../../common/GlobeProjection.js";
 import { MapProjection } from "../../common/MapProjection.js";
-import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/PlateTectonicsButtonOptions.js";
+import {
+  FLAT_RECTANGULAR_BUTTON_OPTIONS,
+  FLAT_RESET_ALL_BUTTON_OPTIONS,
+} from "../../common/PlateTectonicsButtonOptions.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import { MAP_VIEW_BOUNDS, PANEL_SPACING, SCREEN_VIEW_MARGIN } from "../../PlateTectonicsConstants.js";
@@ -49,9 +58,13 @@ const NOTE_FONT = new PhetFont(11);
 
 export type PlateTectonicsScreenViewOptions = ScreenViewOptions;
 
+/** Gap between the zoom buttons and the corner of the viewport they sit in. */
+const ZOOM_BUTTON_MARGIN = 6;
+
 export class PlateTectonicsScreenView extends ScreenView {
   private readonly mapCanvas: MapCanvasNode;
   private readonly globeCanvas: GlobeCanvasNode;
+  private readonly mapProjection: MapProjection;
   private readonly globeProjection: GlobeProjection;
 
   public constructor(
@@ -67,16 +80,30 @@ export class PlateTectonicsScreenView extends ScreenView {
 
     const strings = StringManager.getInstance();
     const a11y = strings.getPlateTectonicsA11yStrings().controls;
-    const projection = new MapProjection(MAP_VIEW_BOUNDS);
+    this.mapProjection = new MapProjection(MAP_VIEW_BOUNDS);
     this.globeProjection = new GlobeProjection(MAP_VIEW_BOUNDS);
 
     // ── Viewport ──────────────────────────────────────────────────────────────
     // Three things share the viewport: the flat map, the globe, and a cross-section.
     // Each carries its own plate-label overlay, because the labels are positioned by
     // the projection they belong to.
-    this.mapCanvas = new MapCanvasNode(model, projection);
-    const flatOverlay = new PlateOverlayNode(model, projection);
-    const flatView = new Node({ children: [this.mapCanvas, flatOverlay] });
+    this.mapCanvas = new MapCanvasNode(model, this.mapProjection);
+    const flatOverlay = new PlateOverlayNode(model, this.mapProjection);
+    // The canvas clips its own painting; the labels are Scenery nodes, so once the
+    // map can be panned they need clipping too or one near the edge spills over the
+    // frame and onto the legend.
+    flatOverlay.clipArea = Shape.bounds(MAP_VIEW_BOUNDS);
+    const flatView = attachMapNavigation(new Node({ children: [this.mapCanvas, flatOverlay] }), {
+      projection: this.mapProjection,
+      accessibleNameProperty: a11y.mapStringProperty,
+      accessibleHelpTextProperty: a11y.mapHelpStringProperty,
+    });
+    // Only the viewport takes the drag, and the focus highlight traces it, so the map
+    // reads as the one rectangular thing it is.
+    const mapShape = Shape.bounds(MAP_VIEW_BOUNDS);
+    flatView.mouseArea = mapShape;
+    flatView.touchArea = mapShape;
+    flatView.focusHighlight = mapShape;
 
     this.globeCanvas = new GlobeCanvasNode(model, this.globeProjection);
     const globeOverlay = new PlateOverlayNode(model, this.globeProjection);
@@ -107,13 +134,37 @@ export class PlateTectonicsScreenView extends ScreenView {
       cornerRadius: 2,
     });
 
+    // Zoom sits in the corner of the map it acts on, the way it does on any map, and
+    // over the Southern Ocean rather than over anything worth looking at.
+    const mapZoomButtons = new PlusMinusZoomButtonGroup(this.mapProjection.zoomLevelProperty, {
+      orientation: "horizontal",
+      spacing: 4,
+      buttonOptions: {
+        ...FLAT_RECTANGULAR_BUTTON_OPTIONS,
+        baseColor: PlateTectonicsColors.controlSurfaceColorProperty,
+        stroke: PlateTectonicsColors.panelBorderColorProperty,
+        cornerRadius: 3,
+        xMargin: 7,
+        yMargin: 7,
+      },
+      iconOptions: { fill: PlateTectonicsColors.controlSurfaceTextColorProperty },
+      accessibleNameZoomIn: a11y.zoomInStringProperty,
+      accessibleNameZoomOut: a11y.zoomOutStringProperty,
+      accessibleHelpTextZoomIn: a11y.zoomHelpStringProperty,
+      accessibleHelpTextZoomOut: a11y.zoomHelpStringProperty,
+      right: MAP_VIEW_BOUNDS.maxX - ZOOM_BUTTON_MARGIN,
+      bottom: MAP_VIEW_BOUNDS.maxY - ZOOM_BUTTON_MARGIN,
+    });
+
     this.addChild(flatView);
     this.addChild(globeView);
     this.addChild(crossSectionView);
     this.addChild(viewportFrame);
+    this.addChild(mapZoomButtons);
 
     model.isFlatMapProperty.link((isFlatMap: boolean) => {
       flatView.visible = isFlatMap;
+      mapZoomButtons.visible = isFlatMap;
     });
     model.isGlobeProperty.link((isGlobe: boolean) => {
       globeView.visible = isGlobe;
@@ -195,11 +246,14 @@ export class PlateTectonicsScreenView extends ScreenView {
     this.loadReliefImage();
 
     // ── Accessibility: keyboard / reading traversal order ─────────────────────
-    // The globe comes first: it is the only thing in the play area that can be
-    // operated, so a keyboard user should reach it before the controls.
+    // The map comes first: it is the only thing in the play area that can be
+    // operated, so a keyboard user should reach it before the controls. Whichever of
+    // the flat map and the globe is hidden drops out of the order on its own.
     this.addChild(
       new Node({
         pdomOrder: [
+          flatView,
+          mapZoomButtons,
           globeView,
           ...viewPanel.focusOrder,
           ...layerPanel.focusOrder,
@@ -223,8 +277,9 @@ export class PlateTectonicsScreenView extends ScreenView {
     image.src = reliefImageUrl;
   }
 
-  /** Resets view-side state: only the globe's camera, which is not model state. */
+  /** Resets view-side state: the two cameras, which are not model state. */
   public reset(): void {
+    this.mapProjection.reset();
     this.globeProjection.reset();
   }
 

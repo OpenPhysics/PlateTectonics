@@ -1,0 +1,113 @@
+{
+  "title": "Tectonique des Plaques",
+  "screens": {
+    "plateTectonics": "Tectonique des Plaques"
+  },
+  "views": {
+    "title": "Vue",
+    "global": "Carte mondiale",
+    "subduction": "Zone de subduction — Fosse du Chili",
+    "divergent": "Dorsale d'expansion — Atlantique",
+    "transform": "Faille transformante — San Andreas"
+  },
+  "layers": {
+    "title": "Couches",
+    "plateBoundaries": "Limites de plaques",
+    "motionVectors": "Vecteurs de mouvement",
+    "earthquakes": "Séismes",
+    "volcanoes": "Volcans et points chauds",
+    "topography": "Topographie / bathymétrie"
+  },
+  "depthFilter": {
+    "title": "Profondeur des séismes",
+    "all": "Toutes les profondeurs",
+    "shallow": "Superficiel (< 70 km)",
+    "intermediate": "Intermédiaire (70–300 km)",
+    "deep": "Profond (> 300 km)"
+  },
+  "time": {
+    "title": "Temps géologique",
+    "present": "Aujourd'hui",
+    "past": "il y a {{value}} millions d'années",
+    "future": "dans {{value}} millions d'années",
+    "rate": "1 seconde = 1 million d'années",
+    "reconstruction": "Positions des plaques extrapolées du mouvement actuel",
+    "topographyAtPresent": "Relief affiché uniquement à l'époque actuelle"
+  },
+  "legend": {
+    "divergent": "Divergente",
+    "convergent": "Convergente",
+    "transform": "Transformante",
+    "shallow": "Séisme superficiel",
+    "intermediate": "Séisme intermédiaire",
+    "deep": "Séisme profond",
+    "volcano": "Volcan",
+    "hotspot": "Point chaud",
+    "motion": "Mouvement des plaques"
+  },
+  "section": {
+    "trench": "Fosse",
+    "ridge": "Dorsale océanique",
+    "fault": "Zone de faille",
+    "arc": "Arc volcanique",
+    "oceanicCrust": "Croûte océanique",
+    "continentalCrust": "Croûte continentale",
+    "lithosphere": "Lithosphère",
+    "asthenosphere": "Asthénosphère",
+    "mantle": "Manteau",
+    "wadatiBenioff": "Zone de Wadati–Benioff",
+    "seaLevel": "Niveau de la mer",
+    "depthAxis": "Profondeur (km)",
+    "distanceAxis": "Distance le long du profil (km)",
+    "verticalExaggeration": "Relief exagéré ×{{value}} verticalement",
+    "relativeMotion": "{{value}} mm/an"
+  },
+  "dataSources": "Plaques : Bird (2003) · Séismes : USGS · Volcans : NOAA/GVP · Relief : NOAA",
+  "a11y": {
+    "plateTectonics": {
+      "screenSummary": {
+        "playArea": "La zone de jeu affiche une carte des plaques tectoniques de la Terre, ou une coupe transversale à travers une limite de plaques. Des couches de données réelles peuvent y être superposées : limites de plaques colorées par type, flèches du mouvement des plaques, épicentres de séismes, volcans et points chauds, et relief ombré de la surface terrestre et du fond océanique.",
+        "controlArea": "La zone de contrôle comporte un sélecteur de vue, une case à cocher pour chaque couche de données, un filtre de profondeur des séismes, des commandes qui font avancer et reculer le mouvement des plaques dans le temps géologique, et un bouton Tout réinitialiser.",
+        "interactionHint": "Activez deux couches et cherchez où elles coïncident : séismes et volcans autour du Pacifique, ou dorsales et séismes superficiels au milieu de l'Atlantique."
+      },
+      "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
+      "viewDetails": {
+        "global": "La carte mondiale est affichée.",
+        "subduction": "Une coupe transversale de la fosse du Chili est affichée, où la plaque de Nazca s'enfonce sous l'Amérique du Sud.",
+        "divergent": "Une coupe transversale de la dorsale médio-atlantique est affichée, où l'Amérique du Nord et l'Afrique s'écartent.",
+        "transform": "Une coupe transversale de la faille de San Andreas est affichée, où les plaques pacifique et nord-américaine glissent l'une contre l'autre."
+      },
+      "layersDetails": "Couches affichées : {{layers}}.",
+      "noLayers": "Aucune couche de données n'est affichée.",
+      "depthDetails": {
+        "all": "Les séismes de toutes les profondeurs sont affichés.",
+        "shallow": "Seuls les séismes superficiels, à moins de 70 kilomètres de profondeur, sont affichés.",
+        "intermediate": "Seuls les séismes de profondeur intermédiaire, entre 70 et 300 kilomètres, sont affichés.",
+        "deep": "Seuls les séismes profonds, à plus de 300 kilomètres, sont affichés."
+      },
+      "timeDetails": {
+        "present": "Les plaques sont dans leurs positions actuelles.",
+        "past": "Les plaques sont montrées telles qu'elles étaient il y a environ {{value}} millions d'années.",
+        "future": "Les plaques sont montrées telles qu'elles seraient dans environ {{value}} millions d'années."
+      },
+      "controls": {
+        "viewSelector": "Vue",
+        "viewSelectorHelp": "Choisissez la carte mondiale ou une coupe transversale d'un type de limite de plaques.",
+        "plateBoundaries": "Limites de plaques",
+        "motionVectors": "Vecteurs de mouvement",
+        "earthquakes": "Séismes",
+        "volcanoes": "Volcans et points chauds",
+        "topography": "Topographie et bathymétrie",
+        "depthFilter": "Profondeur des séismes",
+        "depthFilterHelp": "Affichez les séismes de toutes les profondeurs, ou d'une seule tranche de profondeur.",
+        "timeSlider": "Temps géologique",
+        "timeSliderHelp": "Déplacez les plaques vers le passé ou vers le futur, en millions d'années.",
+        "resetTime": "Revenir à l'époque actuelle"
+      }
+    }
+  },
+  "preferences": {
+    "title": "Simulation",
+    "showPlateLabels": "Afficher les noms des plaques sur la carte"
+  }
+}

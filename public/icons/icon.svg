@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Plate Tectonics</title>
+  <!-- A subduction zone seen in cross-section: ocean at the left, a trench, a
+       volcanic arc on the continent, and the slab descending into the mantle. -->
+  <rect width="512" height="512" fill="#12182b"/>
+
+  <!-- Mantle -->
+  <path d="M0 232h512v280H0z" fill="#5a2a20"/>
+  <!-- Asthenosphere -->
+  <path d="M0 232h512v120H0z" fill="#7a4230"/>
+
+  <!-- Descending slab, dipping to the right -->
+  <path d="M150 196 L360 452 L432 452 L206 178Z" fill="#6b5f7a"/>
+  <path d="M150 196 L360 452 L384 452 L166 184Z" fill="#4c4340" opacity="0.85"/>
+
+  <!-- Oceanic plate to the left of the trench, continental plate to the right -->
+  <path d="M0 178h150l56 54H0z" fill="#6b5f7a"/>
+  <path d="M206 232h306v76H206z" fill="#6b5f7a"/>
+  <path d="M0 178h150v26H0z" fill="#4c4340"/>
+  <path d="M206 196h306v78H206z" fill="#9c7b52"/>
+
+  <!-- Sea -->
+  <path d="M0 140h206v38H0z" fill="#1b4b7a"/>
+  <!-- Trench notch -->
+  <path d="M150 178 L206 196 L206 140 L150 140Z" fill="#1b4b7a"/>
+
+  <!-- Volcanic arc: conduit and cone -->
+  <path d="M300 196 L316 196 L340 340 L276 340Z" fill="#ff7a1a"/>
+  <path d="M308 130 L352 196 L264 196Z" fill="#ff3b30"/>
+
+  <!-- Motion arrows: the ocean plate moves right, the slab sinks -->
+  <path d="M40 118 L108 118 L108 100 L146 128 L108 156 L108 138 L40 138Z" fill="#ffffff"/>
+</svg>

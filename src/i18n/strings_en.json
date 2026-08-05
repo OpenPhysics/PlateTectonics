@@ -20,7 +20,8 @@
     "motionVectors": "Motion vectors",
     "earthquakes": "Earthquakes",
     "volcanoes": "Volcanoes and hotspots",
-    "topography": "Topography / bathymetry"
+    "topography": "Topography / bathymetry",
+    "seafloorAge": "Seafloor age (isochrons)"
   },
   "depthFilter": {
     "title": "Earthquake depth",
@@ -47,7 +48,8 @@
     "deep": "Deep quake",
     "volcano": "Volcano",
     "hotspot": "Hotspot",
-    "motion": "Plate motion"
+    "motion": "Plate motion",
+    "seafloorAge": "Seafloor age 0–180 Ma"
   },
   "section": {
     "trench": "Trench",
@@ -66,11 +68,11 @@
     "verticalExaggeration": "Relief exaggerated ×{{value}} vertically",
     "relativeMotion": "{{value}} mm/yr"
   },
-  "dataSources": "Plates: Bird (2003) · Earthquakes: USGS · Volcanoes: NOAA/GVP · Relief: NOAA",
+  "dataSources": "Plates: Bird (2003) · Earthquakes: USGS · Volcanoes: NOAA/GVP · Relief: NOAA · Seafloor age: EarthByte",
   "a11y": {
     "plateTectonics": {
       "screenSummary": {
-        "playArea": "The play area shows a map of the Earth's tectonic plates, or a cross-section through one plate boundary. Layers of real data can be drawn on top of it: plate boundaries coloured by type, plate motion arrows, earthquake epicentres, volcanoes and hotspots, and shaded relief of the land surface and sea floor.",
+        "playArea": "The play area shows a map of the Earth's tectonic plates, or a cross-section through one plate boundary. Layers of real data can be drawn on top of it: plate boundaries coloured by type, plate motion arrows, earthquake epicentres, volcanoes and hotspots, shaded relief of the land surface and sea floor, and isochrons of the ocean floor — lines of equal crustal age, which run parallel to the spreading ridges and get older away from them.",
         "controlArea": "The control area has a view selector, a checkbox for each data layer, an earthquake depth filter, controls that run plate motion forwards and backwards through geological time, and a Reset All button.",
         "interactionHint": "Switch on a pair of layers and look for where they line up — earthquakes and volcanoes around the Pacific, or ridges and shallow earthquakes down the middle of the Atlantic."
       },
@@ -113,6 +115,7 @@
         "earthquakes": "Earthquakes",
         "volcanoes": "Volcanoes and hotspots",
         "topography": "Topography and bathymetry",
+        "seafloorAge": "Seafloor age isochrons",
         "depthFilter": "Earthquake depth",
         "depthFilterHelp": "Show earthquakes of every depth, or only one depth band.",
         "timeSlider": "Geological time",

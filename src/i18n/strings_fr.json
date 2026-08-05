@@ -20,7 +20,8 @@
     "motionVectors": "Vecteurs de mouvement",
     "earthquakes": "Séismes",
     "volcanoes": "Volcans et points chauds",
-    "topography": "Topographie / bathymétrie"
+    "topography": "Topographie / bathymétrie",
+    "seafloorAge": "Âge du plancher océanique (isochrones)"
   },
   "depthFilter": {
     "title": "Profondeur des séismes",
@@ -47,7 +48,8 @@
     "deep": "Séisme profond",
     "volcano": "Volcan",
     "hotspot": "Point chaud",
-    "motion": "Mouvement des plaques"
+    "motion": "Mouvement des plaques",
+    "seafloorAge": "Âge du plancher 0–180 Ma"
   },
   "section": {
     "trench": "Fosse",
@@ -66,11 +68,11 @@
     "verticalExaggeration": "Relief exagéré ×{{value}} verticalement",
     "relativeMotion": "{{value}} mm/an"
   },
-  "dataSources": "Plaques : Bird (2003) · Séismes : USGS · Volcans : NOAA/GVP · Relief : NOAA",
+  "dataSources": "Plaques : Bird (2003) · Séismes : USGS · Volcans : NOAA/GVP · Relief : NOAA · Âge du plancher : EarthByte",
   "a11y": {
     "plateTectonics": {
       "screenSummary": {
-        "playArea": "La zone de jeu affiche une carte des plaques tectoniques de la Terre, ou une coupe transversale à travers une limite de plaques. Des couches de données réelles peuvent y être superposées : limites de plaques colorées par type, flèches du mouvement des plaques, épicentres de séismes, volcans et points chauds, et relief ombré de la surface terrestre et du fond océanique.",
+        "playArea": "La zone de jeu affiche une carte des plaques tectoniques de la Terre, ou une coupe transversale à travers une limite de plaques. Des couches de données réelles peuvent y être superposées : limites de plaques colorées par type, flèches du mouvement des plaques, épicentres de séismes, volcans et points chauds, relief ombré de la surface terrestre et du fond océanique, et isochrones du plancher océanique — des lignes d'égal âge de la croûte, parallèles aux dorsales et de plus en plus anciennes en s'en éloignant.",
         "controlArea": "La zone de contrôle comporte un sélecteur de vue, une case à cocher pour chaque couche de données, un filtre de profondeur des séismes, des commandes qui font avancer et reculer le mouvement des plaques dans le temps géologique, et un bouton Tout réinitialiser.",
         "interactionHint": "Activez deux couches et cherchez où elles coïncident : séismes et volcans autour du Pacifique, ou dorsales et séismes superficiels au milieu de l'Atlantique."
       },
@@ -113,6 +115,7 @@
         "earthquakes": "Séismes",
         "volcanoes": "Volcans et points chauds",
         "topography": "Topographie et bathymétrie",
+        "seafloorAge": "Isochrones d'âge du plancher océanique",
         "depthFilter": "Profondeur des séismes",
         "depthFilterHelp": "Affichez les séismes de toutes les profondeurs, ou d'une seule tranche de profondeur.",
         "timeSlider": "Temps géologique",

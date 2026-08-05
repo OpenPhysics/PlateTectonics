@@ -28,7 +28,8 @@ export type SwatchKind =
   | "volcanoes"
   | "volcano"
   | "hotspot"
-  | "topography";
+  | "topography"
+  | "seafloorAge";
 
 const SWATCH_WIDTH = 18;
 const SWATCH_HEIGHT = 12;
@@ -117,6 +118,18 @@ export function createLegendSwatch(kind: SwatchKind): Node {
       return new Rectangle(0, 0, SWATCH_WIDTH, SWATCH_HEIGHT, {
         fill: PlateTectonicsColors.reliefRampColorProperties.reduce(
           (gradient, color, index) => gradient.addColorStop(RELIEF_RAMP_STOPS[index] as number, color),
+          new LinearGradient(0, 0, SWATCH_WIDTH, 0),
+        ),
+        cornerRadius: 2,
+      });
+
+    case "seafloorAge":
+      // The age ramp itself, young at the left and old at the right — the layer draws
+      // a line rather than a block, but what it is saying is which end of this bar
+      // each line sits at.
+      return new Rectangle(0, 0, SWATCH_WIDTH, SWATCH_HEIGHT, {
+        fill: PlateTectonicsColors.seafloorAgeRampColorProperties.reduce(
+          (gradient, color, index, stops) => gradient.addColorStop(index / (stops.length - 1), color),
           new LinearGradient(0, 0, SWATCH_WIDTH, 0),
         ),
         cornerRadius: 2,

@@ -25,12 +25,13 @@
  */
 
 import { Multilink } from "scenerystack/axon";
-import { CanvasNode, type CanvasNodeOptions, type Color } from "scenerystack/scenery";
+import { CanvasNode, type CanvasNodeOptions, Color } from "scenerystack/scenery";
 import type { BoundaryType } from "../../common/data/dataTypes.js";
 import { BOUNDARY_SEGMENTS } from "../../common/data/generated/boundaryData.js";
 import { EARTHQUAKES } from "../../common/data/generated/earthquakeData.js";
 import { LAND_RINGS } from "../../common/data/generated/landData.js";
 import { PLATES } from "../../common/data/generated/plateData.js";
+import { ISOCHRON_AGES_MA, ISOCHRONS } from "../../common/data/generated/seafloorAgeData.js";
 import { VOLCANOES } from "../../common/data/generated/volcanoData.js";
 import { HOTSPOTS } from "../../common/data/hotspots.js";
 import type { EarthProjection } from "../../common/EarthProjection.js";
@@ -38,6 +39,8 @@ import { PlateReconstruction } from "../../common/PlateReconstruction.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import {
   BOUNDARY_LINE_WIDTH,
+  ISOCHRON_LINE_WIDTH,
+  MAX_SEAFLOOR_AGE_MA,
   PLATE_FILL_OPACITY,
   QUAKE_BASE_RADIUS,
   QUAKE_RADIUS_PER_MAGNITUDE,
@@ -110,6 +113,7 @@ export abstract class EarthCanvasNode extends CanvasNode {
         model.showEarthquakesProperty,
         model.showVolcanoesProperty,
         model.showTopographyProperty,
+        model.showSeafloorAgeProperty,
         model.earthquakeDepthFilterProperty,
         model.timeMillionsOfYearsProperty,
         ...projection.cameraProperties,
@@ -118,6 +122,7 @@ export abstract class EarthCanvasNode extends CanvasNode {
         PlateTectonicsColors.divergentBoundaryColorProperty,
         PlateTectonicsColors.shallowQuakeColorProperty,
         PlateTectonicsColors.volcanoColorProperty,
+        ...PlateTectonicsColors.seafloorAgeRampColorProperties,
       ],
       () => this.invalidatePaint(),
     );
@@ -156,6 +161,11 @@ export abstract class EarthCanvasNode extends CanvasNode {
     this.paintBase(context);
     if (this.model.showPlatesProperty.value) {
       this.paintPlates(context);
+    }
+    // Under the boundaries, because the youngest isochrons run alongside the ridge
+    // that made them and the ridge is the thing being pointed at.
+    if (this.model.showSeafloorAgeProperty.value) {
+      this.paintIsochrons(context);
     }
     if (this.model.showBoundariesProperty.value) {
       this.paintBoundaries(context);
@@ -281,6 +291,52 @@ export abstract class EarthCanvasNode extends CanvasNode {
     }
   }
 
+  // ── Seafloor age ────────────────────────────────────────────────────────────
+
+  /**
+   * Draws the isochrons of the ocean floor, each in the colour of its own age.
+   *
+   * This is the seafloor spreading argument drawn out: the youngest crust lies in a
+   * thin red band along every spreading ridge, and the same ages appear at the same
+   * distance on *both* sides of it, getting older and bluer out to the continental
+   * margins. Nothing like it exists on land, because the sea floor is made at the
+   * ridges and destroyed at the trenches while the continents stay.
+   *
+   * An isochron is frozen into the crust, so it rides its plate — vertex by vertex,
+   * because a single isochron crosses several plates. Running the clock backwards
+   * therefore walks the two halves of each pair back together onto the ridge that
+   * made them, and crust younger than the reconstruction has reached had not been
+   * made yet, so those isochrons are not drawn at all.
+   */
+  protected paintIsochrons(context: CanvasRenderingContext2D): void {
+    const timeMyr = this.model.timeMillionsOfYearsProperty.value;
+    const youngestExisting = timeMyr < 0 ? -timeMyr : 0;
+
+    context.lineWidth = ISOCHRON_LINE_WIDTH;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+
+    // Oldest first, so the young lines stay legible where isochrons crowd together
+    // against a passive margin — the western Atlantic packs 100 Myr into a few degrees.
+    for (let index = ISOCHRON_AGES_MA.length - 1; index >= 0; index--) {
+      const ageMa = ISOCHRON_AGES_MA[index] as number;
+      if (ageMa < youngestExisting) {
+        continue;
+      }
+      context.strokeStyle = seafloorAgeColor(ageMa).toCSS();
+      context.beginPath();
+      for (const isochron of ISOCHRONS) {
+        if (isochron.ageMa === ageMa) {
+          // Torn where consecutive vertices ride different plates: an isochron really
+          // is cut and offset where a fracture zone crosses it, and once the clock has
+          // run the two pieces are hundreds of kilometres apart.
+          this.appendFeature(context, isochron.coords, isochron.plateIndices, "open", true);
+        }
+      }
+      context.stroke();
+    }
+  }
+
   // ── Earthquakes ─────────────────────────────────────────────────────────────
 
   /**
@@ -370,6 +426,24 @@ function boundaryColor(type: BoundaryType): Color {
   return type === "convergent"
     ? PlateTectonicsColors.convergentBoundaryColorProperty.value
     : PlateTectonicsColors.transformBoundaryColorProperty.value;
+}
+
+/**
+ * Colour for crust of a given age, interpolated along
+ * {@link PlateTectonicsColors.seafloorAgeRampColorProperties}. Ages beyond the ramp —
+ * the few patches of Jurassic sea floor older than {@link MAX_SEAFLOOR_AGE_MA} — take
+ * its last stop.
+ */
+function seafloorAgeColor(ageMa: number): Color {
+  const stops = PlateTectonicsColors.seafloorAgeRampColorProperties;
+  const position = Math.max(0, Math.min(1, ageMa / MAX_SEAFLOOR_AGE_MA)) * (stops.length - 1);
+  const lower = Math.min(stops.length - 1, Math.floor(position));
+  const upper = Math.min(stops.length - 1, lower + 1);
+  return Color.interpolateRGBA(
+    (stops[lower] as (typeof stops)[number]).value,
+    (stops[upper] as (typeof stops)[number]).value,
+    position - lower,
+  );
 }
 
 /** Colour property for an earthquake depth band. */

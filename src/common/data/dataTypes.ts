@@ -107,6 +107,22 @@ export interface EarthquakeCatalog {
   readonly description: string;
 }
 
+/**
+ * One isochron of the ocean floor: a line along which the crust is all the same age.
+ *
+ * `plateIndices[i]` is the index (into `PLATES`) of the plate carrying vertex `i`.
+ * An isochron is frozen into the crust, so unlike a plate boundary it rides the plate
+ * it is part of — which is what makes running the clock backwards walk each isochron
+ * into the ridge it was made at, from both sides at once.
+ */
+export interface IsochronRecord {
+  /** Age of the crust along the line, millions of years. */
+  readonly ageMa: number;
+  /** Flat `[lon, lat, …]` polyline in degrees. */
+  readonly coords: readonly number[];
+  readonly plateIndices: readonly number[];
+}
+
 /** A Holocene volcano or an intraplate hotspot. */
 export interface VolcanoRecord {
   readonly name: string;

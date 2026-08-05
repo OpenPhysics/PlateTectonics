@@ -21,6 +21,10 @@ fitted to the earthquakes that trace it.
 - **Volcanoes and hotspots**: ~1 600 Holocene volcanoes plus the major mantle plumes.
 - **Topography / bathymetry**: shaded relief rendered from the NOAA global DEM, so
   trenches, ridges and mountain belts are visible rather than implied.
+- **Seafloor age (isochrons)**: lines of equal crustal age at 10, 20, 40 … 180 Ma,
+  contoured from the EarthByte age grid. The youngest crust hugs every spreading
+  ridge and the same ages appear at the same distance on both flanks, getting older
+  out to the continental margins — seafloor spreading, drawn from the measurements.
 
 **Cross-sections** — the Chile trench, the Mid-Atlantic Ridge, and the San Andreas
 fault. The surface profile comes from the DEM, the earthquakes and volcanoes are real
@@ -82,6 +86,7 @@ and full Interactive Description support.
 | Earthquakes | [USGS ANSS ComCat](https://earthquake.usgs.gov/fdsnws/event/1/) | Public domain |
 | Volcanoes | [NOAA NCEI](https://www.ngdc.noaa.gov/hazel/) / Smithsonian GVP Holocene volcano list | Public domain |
 | Elevation and bathymetry | [NOAA NCEI global DEM mosaic](https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer) | Public domain |
+| Age of the ocean floor | [EarthByte](https://www.earthbyte.org/category/resources/data-models/seafloor-age/) / Seton et al. (2020), doi:10.1029/2020GC009214 | CC BY 4.0 |
 
 ## License
 

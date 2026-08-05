@@ -2,7 +2,7 @@
  * geophysicalData.test.ts
  *
  * Integrity checks on the generated datasets. `npm run build-data` reaches out to
- * five public services and reshapes what they return; these tests are what stands
+ * six public services and reshapes what they return; these tests are what stands
  * between a silently mangled regeneration and a sim that draws nonsense.
  *
  * They also encode a few facts about the Earth — the Ring of Fire really is where
@@ -17,6 +17,7 @@ import { CROSS_SECTIONS } from "../src/common/data/generated/crossSectionData.js
 import { EARTHQUAKES } from "../src/common/data/generated/earthquakeData.js";
 import { LAND_RINGS } from "../src/common/data/generated/landData.js";
 import { PLATES } from "../src/common/data/generated/plateData.js";
+import { ISOCHRON_AGES_MA, ISOCHRONS } from "../src/common/data/generated/seafloorAgeData.js";
 import { VOLCANOES } from "../src/common/data/generated/volcanoData.js";
 import { HOTSPOTS } from "../src/common/data/hotspots.js";
 import { MOTION_FRAMES, PlateReconstruction } from "../src/common/PlateReconstruction.js";
@@ -244,6 +245,96 @@ describe("volcanoes and hotspots", () => {
     for (const name of ["Hawaii", "Iceland", "Yellowstone", "Galápagos", "Réunion"]) {
       expect(names).toContain(name);
     }
+  });
+});
+
+describe("seafloor isochrons", () => {
+  it("labels every line with one of the ages the ramp is built for", () => {
+    expect(ISOCHRON_AGES_MA.length).toBeGreaterThan(5);
+    expect(ISOCHRONS.length).toBeGreaterThan(100);
+    for (const isochron of ISOCHRONS) {
+      expect(ISOCHRON_AGES_MA).toContain(isochron.ageMa);
+      expect(isochron.coords.length).toBeGreaterThanOrEqual(4);
+      expectValidCoordinates(isochron.coords);
+      expect(isochron.plateIndices.length).toBe(isochron.coords.length / 2);
+      for (const index of isochron.plateIndices) {
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(index).toBeLessThan(PLATES.length);
+      }
+    }
+    for (const ageMa of ISOCHRON_AGES_MA) {
+      expect(
+        ISOCHRONS.filter((isochron) => isochron.ageMa === ageMa).length,
+        `no ${ageMa} Ma isochron`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * The seafloor spreading argument, as an assertion.
+   *
+   * Across the Atlantic at 24° N the profile is as clean as it gets: no trench, no
+   * transform in the way, continental margins either side. Every isochron crosses that
+   * latitude exactly twice, and both crossings step away from the ridge as the age
+   * goes up — which is what "the sea floor is made at the ridge and carried away from
+   * it" looks like in the data. A latitude/longitude swap, a sign error in the contour
+   * levels, or a mangled age grid all break the ordering.
+   */
+  it("steps out symmetrically from the Mid-Atlantic Ridge as the crust gets older", () => {
+    const crossingsAt24North = (ageMa: number): number[] => {
+      const longitudes: number[] = [];
+      for (const isochron of ISOCHRONS) {
+        if (isochron.ageMa !== ageMa) {
+          continue;
+        }
+        const coords = isochron.coords;
+        for (let i = 3; i < coords.length; i += 2) {
+          const from = coords[i - 2] as number;
+          const to = coords[i] as number;
+          if (from === to || from > 24 === to > 24) {
+            continue;
+          }
+          const t = (24 - from) / (to - from);
+          const lon = (coords[i - 3] as number) + t * ((coords[i - 1] as number) - (coords[i - 3] as number));
+          // The Atlantic between the American and African margins, and nowhere else.
+          if (lon > -80 && lon < -5) {
+            longitudes.push(lon);
+          }
+        }
+      }
+      return longitudes;
+    };
+
+    // Everything from 10 Ma to 160 Ma reaches this latitude on both flanks; the 180 Ma
+    // line only survives on the African side, so it is left out of the comparison.
+    const ages = ISOCHRON_AGES_MA.filter((ageMa) => ageMa >= 10 && ageMa <= 160);
+    const flanks = ages.map((ageMa) => {
+      const longitudes = crossingsAt24North(ageMa);
+      expect(longitudes.length, `${ageMa} Ma does not cross 24° N in the Atlantic`).toBeGreaterThan(0);
+      return { ageMa, west: Math.min(...longitudes), east: Math.max(...longitudes) };
+    });
+
+    // The ridge axis, read off the youngest pair rather than assumed.
+    const youngest = flanks[0] as (typeof flanks)[number];
+    const axis = (youngest.west + youngest.east) / 2;
+    expect(axis).toBeGreaterThan(-50);
+    expect(axis).toBeLessThan(-42);
+
+    for (let i = 1; i < flanks.length; i++) {
+      const older = flanks[i] as (typeof flanks)[number];
+      const younger = flanks[i - 1] as (typeof flanks)[number];
+      expect(older.west, `${older.ageMa} Ma should sit west of ${younger.ageMa} Ma`).toBeLessThan(younger.west);
+      expect(older.east, `${older.ageMa} Ma should sit east of ${younger.ageMa} Ma`).toBeGreaterThan(younger.east);
+
+      // Accretion is symmetric to within a degree or two per flank; the tolerance here
+      // is loose enough for the real asymmetry and the 0.3° contouring mesh, and tight
+      // enough that one flank drifting would fail.
+      expect(Math.abs(axis - older.west - (older.east - axis)), `${older.ageMa} Ma is lopsided`).toBeLessThan(6);
+    }
+
+    // Over 160 Myr the two flanks together have opened the whole ocean.
+    const oldest = flanks[flanks.length - 1] as (typeof flanks)[number];
+    expect(oldest.east - oldest.west).toBeGreaterThan(40);
   });
 });
 

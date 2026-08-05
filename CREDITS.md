@@ -9,7 +9,7 @@ GNU Affero General Public License v3.0 or later — see [org LICENSE](https://gi
 
 ## Data sources
 
-The simulation renders published observational data. Two of these sources ask for
+The simulation renders published observational data. Three of these sources ask for
 attribution and all of them deserve it; they are credited on screen, in the About
 dialog, and here.
 
@@ -51,6 +51,21 @@ Program holdings. Public domain.
 [NOAA NCEI global DEM mosaic](https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer).
 Public domain. The shaded relief raster shipped with the sim is rendered from it by
 `npm run build-data`.
+
+### Seafloor age — EarthByte
+
+Seton, M., Müller, R. D., Zahirovic, S., Williams, S., Wright, N. M., Cannon, J.,
+Whittaker, J. M., Matthews, K. J., & McGirr, R. (2020). *A global data set of
+present-day oceanic crustal age and seafloor spreading parameters.* Geochemistry,
+Geophysics, Geosystems, 21, e2020GC009214.
+[doi:10.1029/2020GC009214](https://doi.org/10.1029/2020GC009214)
+
+The 6-arc-minute present-day age grid (version 2020.1, GTS2012 timescale) published by
+the [EarthByte group](https://www.earthbyte.org/category/resources/data-models/seafloor-age/)
+at the University of Sydney, under the
+[Creative Commons Attribution 4.0 licence](https://creativecommons.org/licenses/by/4.0/).
+The isochrons shipped with the sim are contoured from it by `npm run build-data`; the
+grid itself is not redistributed.
 
 ## Acknowledgments
 

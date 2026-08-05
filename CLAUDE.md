@@ -30,6 +30,7 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/common/data/hotspots.ts` | Hand-maintained hotspot list |
 | `src/common/data/generated/` | **Generated — do not edit.** `npm run build-data` owns it |
 | `src/common/data/generated/motionFrameData.ts` | Rotations belonging to boundaries rather than plates |
+| `src/common/data/generated/seafloorAgeData.ts` | Isochrons of the ocean floor, and the ages they are drawn at |
 | `src/plate-tectonics/model/PlateTectonicsModel.ts` | All AXON state |
 | `src/plate-tectonics/model/EarthquakeDepthFilter.ts` | Depth bands and the filter predicate |
 | `src/plate-tectonics/view/PlateTectonicsScreenView.ts` | Layout, view switching, `pdomOrder` |
@@ -42,7 +43,7 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/plate-tectonics/view/CrossSectionNode.ts` | Section + localized annotations |
 | `src/plate-tectonics/view/LegendSwatches.ts` | Map symbols, shared by legend and checkboxes |
 | `scripts/build-data.ts` | Fetches and reshapes every dataset |
-| `scripts/data/` | Fetch cache, GeoTIFF reader, geodesy, emitters |
+| `scripts/data/` | Fetch cache, GeoTIFF and netCDF readers, geodesy, contouring, emitters |
 
 ## Working on this sim
 
@@ -55,15 +56,16 @@ keyed by URL hash, so re-runs are fast and a changed query parameter re-fetches.
 
 `tests/geophysicalData.test.ts` guards the regeneration: it checks structural
 integrity and a few facts about the Earth (deep earthquakes cluster around the
-Pacific; the Chile profile's deep events sit inland of its shallow ones). Run
-`npm test` after any regeneration.
+Pacific; the Chile profile's deep events sit inland of its shallow ones; the Atlantic
+isochrons step out symmetrically from the ridge as they get older). Run `npm test`
+after any regeneration.
 
 `npm run build-data` with no arguments rebuilds everything. Naming steps —
-`plate-model`, `land`, `earthquakes`, `volcanoes`, `relief`, `cross-sections` —
-rebuilds only those, which is how the PB2002 model can be regenerated without also
-pulling a newer earthquake catalogue and a fresh DEM into an unrelated diff.
-`plate-model` covers the plates, their boundaries and the motion frames together,
-because those three index into each other.
+`plate-model`, `land`, `earthquakes`, `volcanoes`, `seafloor-age`, `relief`,
+`cross-sections` — rebuilds only those, which is how the PB2002 model can be
+regenerated without also pulling a newer earthquake catalogue and a fresh DEM into an
+unrelated diff. `plate-model` covers the plates, their boundaries and the motion frames
+together, because those three index into each other.
 
 ### What moves when the clock runs
 
@@ -125,6 +127,12 @@ relevant properties so a Projector Mode switch repaints.
 Boundary colors (red / cyan / violet) and earthquake-depth colors (yellow → orange →
 magenta) have to stay mutually distinguishable *and* readable over the relief raster.
 Check both profiles after changing any of them.
+
+`seafloorAgeRampColorProperties` is a five-stop red → blue ramp, interpolated by age
+rather than indexed, so the number of isochron ages and the number of color stops are
+independent. Its young end deliberately sits near the divergent-boundary red — the
+youngest crust *is* the crust at the ridge — and the two are kept apart by line width
+and draw order instead of by hue.
 
 ## Common components
 

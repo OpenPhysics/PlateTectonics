@@ -76,6 +76,12 @@ export class LayerControlPanel extends PlateTectonicsPanel {
         accessibleName: a11y.topographyStringProperty,
         swatch: createLegendSwatch("topography"),
       },
+      {
+        property: model.showSeafloorAgeProperty,
+        label: layerStrings.seafloorAgeStringProperty,
+        accessibleName: a11y.seafloorAgeStringProperty,
+        swatch: createLegendSwatch("seafloorAge"),
+      },
     ].map(
       (entry) =>
         new Checkbox(
@@ -110,7 +116,7 @@ export class LayerControlPanel extends PlateTectonicsPanel {
         { value: "deep", createNode: () => depthLabel(depthStrings.deepStringProperty, "deep") },
       ],
       {
-        spacing: 5,
+        spacing: 4,
         radioButtonOptions: {
           radius: 7,
           selectedColor: PlateTectonicsColors.accentColorProperty,
@@ -127,15 +133,18 @@ export class LayerControlPanel extends PlateTectonicsPanel {
       depthRadioButtons.enabled = showEarthquakes;
     });
 
+    // Spacings are tight because the control column has to hold this panel, the view
+    // selector and the whole geological-time panel inside the ScreenView's height —
+    // every row of layers here comes out of the time controls below.
     const content = new VBox({
       align: "left",
-      spacing: 9,
+      spacing: 7,
       children: [
         new Text(layerStrings.titleStringProperty, {
           font: TITLE_FONT,
           fill: PlateTectonicsColors.textColorProperty,
         }),
-        new VBox({ align: "left", spacing: 7, children: checkboxes }),
+        new VBox({ align: "left", spacing: 5, children: checkboxes }),
         new Text(depthStrings.titleStringProperty, {
           font: TITLE_FONT,
           fill: PlateTectonicsColors.textColorProperty,
@@ -145,7 +154,7 @@ export class LayerControlPanel extends PlateTectonicsPanel {
     });
 
     const options = optionize<LayerControlPanelOptions, EmptySelfOptions, PlateTectonicsPanelOptions>()(
-      { minWidth: CONTROL_PANEL_WIDTH, align: "left" },
+      { minWidth: CONTROL_PANEL_WIDTH, align: "left", yMargin: 8 },
       providedOptions,
     );
     super(content, options);

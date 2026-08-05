@@ -40,7 +40,8 @@ src/
       LegendSwatches.ts            the symbols, shared by legend and checkboxes
 scripts/
   build-data.ts                  fetches and reshapes every dataset
-  data/                          fetch cache, GeoTIFF reader, geodesy, emitters
+  data/                          fetch cache, GeoTIFF + netCDF readers, geodesy,
+                                 marching-squares contouring, emitters
 ```
 
 ## Why the map is a canvas
@@ -174,6 +175,16 @@ Notable pieces:
 - `scripts/data/dem.ts` contains a ~120-line GeoTIFF reader. NOAA's image service
   returns an uncompressed, tiled, signed-16-bit TIFF, which is little enough format to
   parse directly and saves a dependency.
+- `scripts/data/netcdf.ts` reads the classic netCDF-3 format, for the same reason: the
+  EarthByte age grid is published as a header of big-endian counted fields followed by
+  the raw values, which is small enough to parse directly and saves the build a
+  dependency on the netCDF/HDF5 stack.
+- `scripts/data/contour.ts` is marching squares, used once, to turn that age grid into
+  isochron polylines. Cells with a missing corner are skipped whole, so a contour stops
+  at the edge of the ocean instead of being interpolated onto land, and it works in
+  grid coordinates so that two neighbouring cells produce bit-identical crossings on
+  their shared edge — which is what lets the segments be strung together by exact key
+  match rather than by proximity.
 - Boundary segments are rebuilt from PB2002's *step* file rather than its boundary
   file, because only the steps carry the class (`OSR`, `SUB`, `CTF`, …) that the
   divergent / convergent / transform colouring needs.

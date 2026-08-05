@@ -23,6 +23,7 @@ describe("PlateTectonicsModel", () => {
     expect(model.showEarthquakesProperty.value).toBe(false);
     expect(model.showVolcanoesProperty.value).toBe(false);
     expect(model.showTopographyProperty.value).toBe(false);
+    expect(model.showSeafloorAgeProperty.value).toBe(false);
     expect(model.earthquakeDepthFilterProperty.value).toBe("all");
     expect(model.selectedViewProperty.value).toBe("global");
     expect(model.timeMillionsOfYearsProperty.value).toBe(0);
@@ -131,6 +132,7 @@ describe("PlateTectonicsModel", () => {
     model.showEarthquakesProperty.value = true;
     model.showVolcanoesProperty.value = true;
     model.showTopographyProperty.value = true;
+    model.showSeafloorAgeProperty.value = true;
     model.earthquakeDepthFilterProperty.value = "deep";
     model.selectedViewProperty.value = "transform";
     model.timeSpeedProperty.value = TimeSpeed.FAST;
@@ -145,6 +147,7 @@ describe("PlateTectonicsModel", () => {
     expect(model.showEarthquakesProperty.value).toBe(false);
     expect(model.showVolcanoesProperty.value).toBe(false);
     expect(model.showTopographyProperty.value).toBe(false);
+    expect(model.showSeafloorAgeProperty.value).toBe(false);
     expect(model.earthquakeDepthFilterProperty.value).toBe("all");
     expect(model.selectedViewProperty.value).toBe("global");
     expect(model.timeSpeedProperty.value).toBe(TimeSpeed.NORMAL);

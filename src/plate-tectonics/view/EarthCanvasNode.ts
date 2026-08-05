@@ -58,6 +58,36 @@ export type RingMode = "fill" | "stroke" | "open";
 /** Depth bands in draw order: deep first, so the shallow crowd along the trenches stays on top. */
 const DEPTH_BANDS: readonly DepthBand[] = ["deep", "intermediate", "shallow"];
 
+/**
+ * How close to ±180° of longitude, or to a pole, a vertex has to be for its segment to
+ * count as a dataset seam. The seams sit on those lines exactly, so this only has to
+ * absorb the last digit of the stored coordinate — see {@link isSeamSegment}.
+ */
+const SEAM_TOLERANCE_DEGREES = 1e-6;
+
+/**
+ * Whether a source segment is a seam cut into the dataset to make it fit a rectangle,
+ * rather than a real edge of the feature.
+ *
+ * A plate that straddles the antimeridian is stored as a polygon slit open along
+ * ±180°, and one that reaches a pole is closed off along the pole itself — fourteen
+ * such segments in `PLATES`, plus two along the poles. They are not edges of anything,
+ * so they are never *stroked*: on the globe they would draw as bright lines up the
+ * middle of the Pacific and across the Arctic, and on the flat map they do the same as
+ * soon as the map is panned off centre and ±180° stops being the edge of the viewport.
+ * They are still *filled*, because the polygon needs them to close.
+ *
+ * Judged on the source coordinates, because a seam is a property of how the dataset
+ * was cut, not of where the reconstruction has since carried it.
+ */
+export function isSeamSegment(lonA: number, latA: number, lonB: number, latB: number): boolean {
+  const onAntimeridian =
+    Math.abs(Math.abs(lonA) - 180) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(lonB) - 180) < SEAM_TOLERANCE_DEGREES;
+  const alongPole =
+    Math.abs(Math.abs(latA) - 90) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(latB) - 90) < SEAM_TOLERANCE_DEGREES;
+  return onAntimeridian || alongPole;
+}
+
 export type EarthCanvasNodeOptions = CanvasNodeOptions;
 
 export abstract class EarthCanvasNode extends CanvasNode {

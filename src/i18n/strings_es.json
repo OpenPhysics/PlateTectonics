@@ -10,7 +10,8 @@
     "divergent": "Dorsal de expansión — Atlántico Medio",
     "transform": "Falla transformante — San Andrés",
     "globe": "Mostrar como globo 3D",
-    "globeHint": "Arrastre el globo para girar la Tierra"
+    "globeHint": "Arrastre el globo para girar la Tierra",
+    "mapHint": "Arrastre el mapa para moverlo de este a oeste; acérquese para verlo en detalle"
   },
   "layers": {
     "title": "Capas",
@@ -77,7 +78,7 @@
       },
       "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
       "viewDetails": {
-        "global": "Se muestra el mapa global.",
+        "global": "Se muestra el mapa global. Puede moverse hacia el este y el oeste, y ampliarse para observar de cerca una región.",
         "globe": "La Tierra se muestra como un globo, que puede girarse para traer cualquier región al campo de visión.",
         "subduction": "Se muestra un corte transversal de la fosa de Chile, donde la placa de Nazca subduce bajo América del Sur.",
         "divergent": "Se muestra un corte transversal de la dorsal Mesoatlántica, donde América del Norte y África se separan.",
@@ -103,6 +104,11 @@
         "globeToggleHelp": "Dibujar el mapa global sobre un globo que puede girarse, en lugar de un mapa rectangular plano.",
         "globe": "Globo",
         "globeHelp": "Arrastre el globo para girar la Tierra. Con el globo seleccionado, las flechas izquierda y derecha mueven la vista hacia el este y el oeste, y las flechas arriba y abajo la mueven hacia el norte y el sur.",
+        "map": "Mapa",
+        "mapHelp": "Arrastre el mapa para moverlo. Con el mapa seleccionado, las flechas izquierda y derecha mueven la vista hacia el este y el oeste; una vez ampliado el mapa, las flechas arriba y abajo la mueven hacia el norte y el sur.",
+        "zoomIn": "Acercar el mapa",
+        "zoomOut": "Alejar el mapa",
+        "zoomHelp": "Acérquese para observar de cerca una región, o aléjese para recuperar el mundo entero.",
         "plates": "Placas tectónicas",
         "plateBoundaries": "Límites de placas",
         "motionVectors": "Vectores de movimiento",

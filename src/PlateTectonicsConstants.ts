@@ -59,6 +59,29 @@ export const VELOCITY_VECTOR_SCALE = 26;
  */
 export const ISOCHRON_LINE_WIDTH = 1.1;
 
+// ── Panning and zooming the flat map ──────────────────────────────────────────
+
+/** Zoom level at which the whole world fits the viewport; the map opens here. */
+export const MAP_MIN_ZOOM_LEVEL = 0;
+
+/**
+ * Deepest zoom level, as a power of two: level 3 is 8×, which puts 45° of longitude
+ * across the viewport — enough to look along the Chile trench or the San Andreas
+ * fault. Going further would only magnify the relief raster, which is 1440 × 720 and
+ * is already being upscaled fourfold by then.
+ */
+export const MAP_MAX_ZOOM_LEVEL = 3;
+
+/** View pixels the map pans per press of an arrow key, at every zoom level. */
+export const MAP_KEYBOARD_STEP_PIXELS = 10;
+
+/**
+ * How far outside the viewport a feature's centre may be and still count as on
+ * screen. Wide enough for the largest earthquake marker and for a plate label, so
+ * neither vanishes while part of it should still be visible at the edge.
+ */
+export const MAP_VIEWPORT_CULL_MARGIN = 30;
+
 // ── Globe rendering ───────────────────────────────────────────────────────────
 
 /**
@@ -152,6 +175,10 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   VOLCANO_MARKER_SIZE,
   VELOCITY_VECTOR_SCALE,
   ISOCHRON_LINE_WIDTH,
+  MAP_MIN_ZOOM_LEVEL,
+  MAP_MAX_ZOOM_LEVEL,
+  MAP_KEYBOARD_STEP_PIXELS,
+  MAP_VIEWPORT_CULL_MARGIN,
   GLOBE_RADIUS_MARGIN,
   GLOBE_INITIAL_CENTER_LON,
   GLOBE_INITIAL_CENTER_LAT,

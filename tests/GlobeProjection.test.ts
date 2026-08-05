@@ -8,7 +8,8 @@
 
 import { Bounds2 } from "scenerystack/dot";
 import { describe, expect, it } from "vitest";
-import { GlobeProjection, wrapLongitude } from "../src/common/GlobeProjection.js";
+import { wrapLongitude } from "../src/common/EarthProjection.js";
+import { GlobeProjection } from "../src/common/GlobeProjection.js";
 import { GLOBE_INITIAL_CENTER_LAT, GLOBE_INITIAL_CENTER_LON } from "../src/PlateTectonicsConstants.js";
 
 const bounds = new Bounds2(10, 20, 738, 384);

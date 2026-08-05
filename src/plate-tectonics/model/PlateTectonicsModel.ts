@@ -39,31 +39,35 @@ export const TIME_RANGE = new Range(-TIME_RANGE_MYR, TIME_RANGE_MYR);
 
 export class PlateTectonicsModel implements TModel {
   // ── Layer visibility ────────────────────────────────────────────────────────
+  //
+  // Every layer starts off. The sim opens on a bare ocean-and-coastline map, and the
+  // question it asks is which of these datasets to put on it — which is a question a
+  // student can only see if the answer is not already drawn for them. Switching two
+  // layers on and finding where they coincide is the interaction hint the screen
+  // summary gives, and it only means anything from an empty map.
 
   /** The per-plate colour wash and plate outlines. */
-  public readonly showPlatesProperty = new BooleanProperty(true);
+  public readonly showPlatesProperty = new BooleanProperty(false);
 
   /** Plate boundaries, colour-coded divergent / convergent / transform. */
-  public readonly showBoundariesProperty = new BooleanProperty(true);
+  public readonly showBoundariesProperty = new BooleanProperty(false);
 
   /** Absolute plate motion vectors, scaled in mm/year. */
-  public readonly showVectorsProperty = new BooleanProperty(true);
+  public readonly showVectorsProperty = new BooleanProperty(false);
 
   /** Earthquake epicentres, sized by magnitude and coloured by depth. */
-  public readonly showEarthquakesProperty = new BooleanProperty(true);
+  public readonly showEarthquakesProperty = new BooleanProperty(false);
 
   /** Holocene volcanoes and intraplate hotspots. */
-  public readonly showVolcanoesProperty = new BooleanProperty(true);
+  public readonly showVolcanoesProperty = new BooleanProperty(false);
 
   /** The shaded relief raster: land topography and ocean-floor bathymetry. */
-  public readonly showTopographyProperty = new BooleanProperty(true);
+  public readonly showTopographyProperty = new BooleanProperty(false);
 
   /**
    * Isochrons of the ocean floor — lines of equal crustal age, coloured young to old.
-   *
-   * Off by default: it is the one layer that is an argument rather than an
-   * observation to be browsed, and it reads best switched on deliberately, over a map
-   * whose other layers have been turned down.
+   * Best read with the boundaries on and everything else off, which is when the
+   * isochrons and the ridges that made them are the only two things on the map.
    */
   public readonly showSeafloorAgeProperty = new BooleanProperty(false);
 

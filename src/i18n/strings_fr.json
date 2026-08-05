@@ -10,7 +10,8 @@
     "divergent": "Dorsale d'expansion — Atlantique",
     "transform": "Faille transformante — San Andreas",
     "globe": "Afficher en globe 3D",
-    "globeHint": "Faites glisser le globe pour faire tourner la Terre"
+    "globeHint": "Faites glisser le globe pour faire tourner la Terre",
+    "mapHint": "Faites glisser la carte pour la déplacer d'est en ouest ; zoomez pour regarder de plus près"
   },
   "layers": {
     "title": "Couches",
@@ -75,7 +76,7 @@
       },
       "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
       "viewDetails": {
-        "global": "La carte mondiale est affichée.",
+        "global": "La carte mondiale est affichée. Elle peut être déplacée vers l'est et vers l'ouest, et agrandie pour examiner une région de près.",
         "globe": "La Terre est affichée en globe, que l'on peut faire tourner pour amener n'importe quelle région dans le champ de vision.",
         "subduction": "Une coupe transversale de la fosse du Chili est affichée, où la plaque de Nazca s'enfonce sous l'Amérique du Sud.",
         "divergent": "Une coupe transversale de la dorsale médio-atlantique est affichée, où l'Amérique du Nord et l'Afrique s'écartent.",
@@ -101,6 +102,11 @@
         "globeToggleHelp": "Dessiner la carte mondiale sur un globe que l'on peut faire tourner, au lieu d'une carte rectangulaire plate.",
         "globe": "Globe",
         "globeHelp": "Faites glisser le globe pour faire tourner la Terre. Lorsque le globe est sélectionné, les flèches gauche et droite déplacent la vue vers l'est et vers l'ouest, et les flèches haut et bas la déplacent vers le nord et vers le sud.",
+        "map": "Carte",
+        "mapHelp": "Faites glisser la carte pour la déplacer. Lorsque la carte est sélectionnée, les flèches gauche et droite déplacent la vue vers l'est et vers l'ouest ; une fois la carte agrandie, les flèches haut et bas la déplacent vers le nord et vers le sud.",
+        "zoomIn": "Agrandir la carte",
+        "zoomOut": "Réduire la carte",
+        "zoomHelp": "Agrandissez pour examiner une région de près, ou réduisez pour retrouver le monde entier.",
         "plates": "Plaques tectoniques",
         "plateBoundaries": "Limites de plaques",
         "motionVectors": "Vecteurs de mouvement",

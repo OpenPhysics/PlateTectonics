@@ -21,9 +21,10 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/PlateTectonicsNamespace.ts` | Namespace for color property names |
 | `src/i18n/StringManager.ts` | Singleton localized string accessor |
 | `src/common/EarthProjection.ts` | The interface both projections implement |
-| `src/common/MapProjection.ts` | Equirectangular lon/lat ↔ view |
+| `src/common/MapProjection.ts` | Equirectangular lon/lat ↔ view, plus the flat map's camera |
 | `src/common/GlobeProjection.ts` | Orthographic lon/lat ↔ view, plus the globe's camera |
 | `src/common/attachGlobeRotation.ts` | Drag and arrow keys → the globe's camera |
+| `src/common/attachMapNavigation.ts` | Drag and arrow keys → the flat map's camera |
 | `src/common/PlateReconstruction.ts` | Euler-pole rotation, plate velocities, `MOTION_FRAMES` |
 | `src/common/data/dataTypes.ts` | Shapes of every dataset (hand-written) |
 | `src/common/data/hotspots.ts` | Hand-maintained hotspot list |
@@ -85,9 +86,18 @@ header and in `doc/implementation-notes.md`. Text stays as Scenery `Text` so it 
 localized and reached by a screen reader.
 
 Sphere-on-a-rectangle hazards (antimeridian wrapping, circumpolar rings, ring closure,
-coastlines tearing at plate boundaries) are all handled in
-`MapCanvasNode.appendPolyline`. Read its comments before touching it; each rule is
-there because of a specific artifact.
+coastlines tearing at plate boundaries, the seams the datasets were cut along) are all
+handled in `MapCanvasNode.appendPolyline`. Read its comments before touching it; each
+rule is there because of a specific artifact.
+
+The flat map **pans and zooms**, so ±180° is no longer reliably off screen and a
+feature is traced relative to the camera rather than to the map's ±180° home. Both
+global views therefore carry a camera in the *view*: `MapProjection` has a centre
+longitude, a centre latitude and a zoom level, and `MapProjection.latitudeLimit` is
+what makes vertical panning do nothing until the user zooms in — a bounded axis, not
+an interaction rule. `EarthProjection.project` reports whether a point is on screen,
+which on the flat map now means "inside the viewport" as well. The reasoning is in
+[`doc/implementation-notes.md`](doc/implementation-notes.md#panning-and-zooming-the-flat-map).
 
 The global map is drawn either flat or as a rotatable 3-D globe, from the same data.
 `EarthCanvasNode` owns what they share — which layers exist, in what order, in what

@@ -106,8 +106,9 @@ export class ViewControlPanel extends PlateTectonicsPanel {
       globeCheckbox.enabled = !isCrossSection;
     });
 
-    // Shown only while the globe is up, where it is the one thing a first-time user
-    // will not guess: that the Earth on screen can be taken hold of and turned.
+    // One hint per global view, because in both cases the thing a first-time user
+    // will not guess is the same: that the Earth on screen can be taken hold of and
+    // moved. Only one of the two is ever showing, so they share a slot.
     const globeHint = new Text(viewStrings.globeHintStringProperty, {
       font: HINT_FONT,
       fill: PlateTectonicsColors.secondaryTextColorProperty,
@@ -115,6 +116,15 @@ export class ViewControlPanel extends PlateTectonicsPanel {
     });
     model.isGlobeProperty.link((isGlobe: boolean) => {
       globeHint.visible = isGlobe;
+    });
+
+    const mapHint = new Text(viewStrings.mapHintStringProperty, {
+      font: HINT_FONT,
+      fill: PlateTectonicsColors.secondaryTextColorProperty,
+      maxWidth: CONTROL_PANEL_WIDTH - 30,
+    });
+    model.isFlatMapProperty.link((isFlatMap: boolean) => {
+      mapHint.visible = isFlatMap;
     });
 
     const content = new VBox({
@@ -128,6 +138,7 @@ export class ViewControlPanel extends PlateTectonicsPanel {
         comboBox,
         globeCheckbox,
         globeHint,
+        mapHint,
       ],
     });
 

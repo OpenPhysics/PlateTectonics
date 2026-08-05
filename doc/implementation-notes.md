@@ -11,9 +11,10 @@ src/
   PlateTectonicsConstants.ts     layout px, Earth-science quantities, time range
   common/
     EarthProjection.ts           the interface both projections implement
-    MapProjection.ts             equirectangular lon/lat ↔ view
+    MapProjection.ts             equirectangular lon/lat ↔ view, with a camera
     GlobeProjection.ts           orthographic lon/lat ↔ view, with a camera
     attachGlobeRotation.ts       drag + arrow keys → the globe's camera
+    attachMapNavigation.ts       drag + arrow keys → the flat map's camera
     PlateReconstruction.ts       Euler-pole rotation and plate velocities
     data/
       dataTypes.ts               shapes of every dataset (hand-written)
@@ -67,12 +68,16 @@ Three problems come out of the projection, all handled in `MapCanvasNode.appendP
 
 1. **The antimeridian.** Longitudes are unwrapped as a polyline is walked — each
    vertex is nudged by whole turns to stay within half a turn of the previous one — so
-   a feature that straddles ±180° stays in one piece. The ring is then repeated a
-   world-width either side, and the clip keeps whichever copy is on screen.
+   a feature that straddles ±180° stays in one piece. The *first* vertex is unwrapped
+   against the camera instead, which puts the feature on the copy of the world the map
+   is looking at; the feature is then repeated a world-width either side whenever that
+   copy would show it too, and the clip keeps whichever copies are on screen.
 2. **Circumpolar rings.** The North American plate reaches right around the Arctic and
    the Antarctic plate around the South Pole, so their rings gain a whole turn of
    longitude. Filling one has to route over the pole it encloses, or the fill spills
-   across the map.
+   across the map. The turns the *walk* accumulates are counted separately from the
+   turns that carried the feature to the camera, or a plate far from the camera would
+   be mistaken for one that goes round the world.
 3. **Closing.** Every ring in the data repeats its first vertex at the end, so outlines
    are already closed and `closePath` is only used for fills — which is just as well,
    because on an unwrapped ring `closePath` would draw a chord straight across the map.
@@ -81,6 +86,40 @@ Coastline vertices carry a *per-vertex* plate index, so a coastline that straddl
 boundary tears apart correctly under reconstruction — Baja California rides the Pacific
 plate away from North America. The outline is broken at those tears (the fill still
 spans them) so the torn edge does not leave a stray line across the ocean.
+
+## Panning and zooming the flat map
+
+`MapProjection` carries a camera of the same shape as the globe's — the longitude and
+latitude at the centre of the viewport — plus a zoom level the map is drawn at 2^level.
+`attachMapNavigation` moves it, in the same two senses `attachGlobeRotation` uses: a
+drag takes hold of the map, and the arrow keys move the viewpoint.
+
+The two axes are not symmetric, and the projection is why. Longitude is periodic, so
+panning east wraps and never stops. Latitude is bounded, so the camera is clamped to
+`latitudeLimit` = 90 − 90/scale: **zero at level 0**, where the whole 180° is already on
+screen and there is nothing to pan to, and opening up as zooming in shrinks what fits.
+That is the whole of "left and right always, up and down once you are zoomed in" — no
+interaction code special-cases it.
+
+Three things follow from the camera, and each one is a bug that was visible before it
+was fixed:
+
+- `project` now reports **false outside the viewport**, which is what stops a plate
+  label being drawn over the legend and saves the canvas from plotting 9 000
+  epicentres that are four viewport-widths off to the side. The flat overlay is
+  clipped to the viewport as well, so a label at the edge is cut rather than spilling.
+- `viewX` deliberately does **not** wrap: the mapping stays linear so an unwrapped
+  polyline keeps its shape. Wrapping is `project`'s business, for single points.
+- The **dataset seams** — the ±180° slits and polar closures that `PLATES` and
+  `LAND_RINGS` are cut along — used to sit exactly on the edge of the viewport, where
+  they could not be seen. Panning moves that edge, so they are now skipped when
+  stroking (never when filling) by the same `isSeamSegment` rule the globe has always
+  used; it moved to `EarthCanvasNode` when the second caller appeared. Without it the
+  Pacific gets a bright line straight up the middle of it.
+
+Reset All puts both cameras back, through `PlateTectonicsScreenView.reset` — a camera
+is a way of looking at the Earth rather than a fact about it, so neither belongs in the
+model. `showGlobeProperty` does, because it is a choice about what is shown.
 
 ## Drawing a sphere as a sphere
 
@@ -152,9 +191,12 @@ Generated files are excluded from Biome (see `biome.json`) and formatted by
   which depths pass the filter, and where in geological time the plates are.
 - Every control carries an `accessibleName` (and a help text where it earns one) from
   the `a11y` string group.
-- `PlateTectonicsScreenView` sets an explicit `pdomOrder`: view selector → layer
-  checkboxes → depth filter → time slider → time controls → Reset All.
-- The keyboard-help dialog has a section per interaction kind: slider, combo box, and
+- `PlateTectonicsScreenView` sets an explicit `pdomOrder`: the global view and its zoom
+  buttons → view selector → layer checkboxes → depth filter → time slider → time
+  controls → Reset All. The map and the globe are both in it; whichever is hidden drops
+  out on its own.
+- The keyboard-help dialog has a section per interaction kind: slider, moving a
+  draggable item (which is how both the map and the globe are moved), combo box, and
   basic actions.
 
 ## Testing
@@ -166,7 +208,7 @@ Generated files are excluded from Biome (see `biome.json`) and formatted by
 | `PlateReconstruction.test.ts` | Euler-pole rotation, round trips, and plate speeds against published values |
 | `PlateTectonicsModel.test.ts` | layer state, depth bands, the time clock and reset |
 | `CrossSectionGeometry.test.ts` | the two-band layout, crust switching, slab fitting, ridge cooling |
-| `MapProjection.test.ts` | projection round trips, the 2:1 viewport, motion-arrow bearings |
+| `MapProjection.test.ts` | projection round trips, the 2:1 viewport, motion-arrow bearings, the camera |
 | `GlobeProjection.test.ts` | orthographic projection and its inverse, visibility, bearings, the camera |
 | `geophysicalData.test.ts` | integrity of every generated dataset, plus a few facts about the Earth |
 | `memory-leak.test.ts` | WeakRef + forced GC on disposables |

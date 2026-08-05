@@ -28,7 +28,7 @@
 import { NumberProperty, type TReadOnlyProperty } from "scenerystack/axon";
 import type { Bounds2 } from "scenerystack/dot";
 import { GLOBE_INITIAL_CENTER_LAT, GLOBE_INITIAL_CENTER_LON, GLOBE_RADIUS_MARGIN } from "../PlateTectonicsConstants.js";
-import type { EarthProjection } from "./EarthProjection.js";
+import { type EarthProjection, wrapLongitude } from "./EarthProjection.js";
 
 const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -39,11 +39,6 @@ const RAD_TO_DEG = 180 / Math.PI;
  * the direction at the point rather than an average over a long way round the Earth.
  */
 const BEARING_STEP_RAD = 1 * DEG_TO_RAD;
-
-/** Wraps a longitude into [-180, 180), so the camera value stays bounded as it spins. */
-export function wrapLongitude(lon: number): number {
-  return ((((lon + 180) % 360) + 360) % 360) - 180;
-}
 
 export class GlobeProjection implements EarthProjection {
   public readonly viewBounds: Bounds2;

@@ -31,10 +31,11 @@
  */
 
 import type { CanvasNodeOptions } from "scenerystack/scenery";
-import { type GlobeProjection, wrapLongitude } from "../../common/GlobeProjection.js";
+import { wrapLongitude } from "../../common/EarthProjection.js";
+import type { GlobeProjection } from "../../common/GlobeProjection.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
-import { EarthCanvasNode, type RingMode } from "./EarthCanvasNode.js";
+import { EarthCanvasNode, isSeamSegment, type RingMode } from "./EarthCanvasNode.js";
 
 const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -63,13 +64,6 @@ const MAX_SEGMENT_DEGREES = 5;
 
 /** Starting size of the scratch buffers, chosen to cover most features in one go. */
 const INITIAL_BUFFER_CAPACITY = 1024;
-
-/**
- * How close to ±180° of longitude, or to a pole, a vertex has to be for its segment to
- * count as a dataset seam. The seams sit on those lines exactly, so this only has to
- * absorb the last digit of the stored coordinate — see {@link isSeamSegment}.
- */
-const SEAM_TOLERANCE_DEGREES = 1e-6;
 
 const mod2pi = (angle: number): number => ((angle % TWO_PI) + TWO_PI) % TWO_PI;
 
@@ -573,26 +567,6 @@ function interpolateGreatCircle(lonA: number, latA: number, lonB: number, latB: 
  * The separation is the flat-Earth approximation — near enough at these sizes, and it
  * only decides how finely to sample.
  */
-/**
- * Whether a source segment is a seam cut into the dataset to make it fit a rectangle,
- * rather than a real edge of the feature.
- *
- * A plate that straddles the antimeridian is stored as a polygon slit open along
- * ±180°, and one that reaches a pole is closed off along the pole itself — fourteen
- * such segments in `PLATES`, plus two along the poles. On the flat map they fall
- * exactly on the edge of the viewport and are never seen. On a globe the antimeridian
- * is an ordinary meridian, so they would draw as bright lines up the middle of the
- * Pacific and across the Arctic; they are therefore not stroked. They are still
- * *filled*, because the polygon needs them to close.
- */
-function isSeamSegment(lonA: number, latA: number, lonB: number, latB: number): boolean {
-  const onAntimeridian =
-    Math.abs(Math.abs(lonA) - 180) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(lonB) - 180) < SEAM_TOLERANCE_DEGREES;
-  const alongPole =
-    Math.abs(Math.abs(latA) - 90) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(latB) - 90) < SEAM_TOLERANCE_DEGREES;
-  return onAntimeridian || alongPole;
-}
-
 function subdivisionsFor(lonA: number, latA: number, lonB: number, latB: number): number {
   const deltaLat = latB - latA;
   const deltaLon = wrapLongitude(lonB - lonA);

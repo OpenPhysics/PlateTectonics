@@ -28,30 +28,45 @@ export class PlateTectonicsScreenSummaryContent extends ScreenSummaryContent {
     const viewDescription = new DerivedStringProperty(
       [
         model.selectedViewProperty,
+        model.showGlobeProperty,
         a11y.viewDetails.globalStringProperty,
+        a11y.viewDetails.globeStringProperty,
         a11y.viewDetails.subductionStringProperty,
         a11y.viewDetails.divergentStringProperty,
         a11y.viewDetails.transformStringProperty,
       ],
-      (view: ViewKey, global: string, subduction: string, divergent: string, transform: string) => {
+      (
+        view: ViewKey,
+        showGlobe: boolean,
+        global: string,
+        globe: string,
+        subduction: string,
+        divergent: string,
+        transform: string,
+      ) => {
         if (view === "subduction") {
           return subduction;
         }
         if (view === "divergent") {
           return divergent;
         }
-        return view === "transform" ? transform : global;
+        if (view === "transform") {
+          return transform;
+        }
+        return showGlobe ? globe : global;
       },
     );
 
     // Which layers are switched on, listed by name.
     const layerList = new DerivedStringProperty(
       [
+        model.showPlatesProperty,
         model.showBoundariesProperty,
         model.showVectorsProperty,
         model.showEarthquakesProperty,
         model.showVolcanoesProperty,
         model.showTopographyProperty,
+        layerStrings.platesStringProperty,
         layerStrings.plateBoundariesStringProperty,
         layerStrings.motionVectorsStringProperty,
         layerStrings.earthquakesStringProperty,
@@ -59,11 +74,13 @@ export class PlateTectonicsScreenSummaryContent extends ScreenSummaryContent {
         layerStrings.topographyStringProperty,
       ],
       (
+        plates: boolean,
         boundaries: boolean,
         vectors: boolean,
         earthquakes: boolean,
         volcanoes: boolean,
         topography: boolean,
+        platesName: string,
         boundariesName: string,
         vectorsName: string,
         earthquakesName: string,
@@ -71,6 +88,7 @@ export class PlateTectonicsScreenSummaryContent extends ScreenSummaryContent {
         topographyName: string,
       ) =>
         [
+          plates ? platesName : null,
           boundaries ? boundariesName : null,
           vectors ? vectorsName : null,
           earthquakes ? earthquakesName : null,

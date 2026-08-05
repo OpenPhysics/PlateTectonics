@@ -39,6 +39,33 @@ describe("MapProjection", () => {
     }
   });
 
+  it("shows the whole world, so every point projects on screen", () => {
+    for (const [lon, lat] of [
+      [0, 0],
+      [-180, -90],
+      [180, 90],
+      [139.7, 35.7],
+    ] as const) {
+      expect(projection.project(lon, lat)).toBe(true);
+      expect(projection.x).toBeCloseTo(projection.viewX(lon), 9);
+      expect(projection.y).toBeCloseTo(projection.viewY(lat), 9);
+    }
+  });
+
+  it("draws a motion arrow along its compass bearing, wherever the plate is", () => {
+    // North is up and east is right at every latitude — the map does not swing the
+    // arrow to follow the way longitude is stretched near the poles.
+    for (const lat of [0, 60, -60]) {
+      projection.bearing(0, lat, 0);
+      expect(projection.bearingX).toBeCloseTo(0, 9);
+      expect(projection.bearingY).toBeCloseTo(-1, 9);
+
+      projection.bearing(0, lat, 90);
+      expect(projection.bearingX).toBeCloseTo(1, 9);
+      expect(projection.bearingY).toBeCloseTo(0, 9);
+    }
+  });
+
   it("uses the same pixels per degree on both axes in the sim's viewport", () => {
     // A 2:1 viewport is what keeps the equirectangular map from being stretched.
     const simProjection = new MapProjection(MAP_VIEW_BOUNDS);

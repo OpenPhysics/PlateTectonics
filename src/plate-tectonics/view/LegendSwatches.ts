@@ -14,6 +14,7 @@ import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 
 /** Every symbol the legend and the layer checkboxes can show. */
 export type SwatchKind =
+  | "plates"
   | "boundaries"
   | "divergent"
   | "convergent"
@@ -32,9 +33,19 @@ export type SwatchKind =
 const SWATCH_WIDTH = 18;
 const SWATCH_HEIGHT = 12;
 
+/** Opacity of the plate-palette blocks in the "tectonic plates" swatch. */
+const PLATE_SWATCH_OPACITY = 0.75;
+
 /** Builds the icon for one symbol, centred on its own origin-free bounds. */
 export function createLegendSwatch(kind: SwatchKind): Node {
   switch (kind) {
+    case "plates":
+      // Three neighbouring palette colours meeting at outlined edges — the colour
+      // wash that tells one plate from the next.
+      return new Node({
+        children: [0, 1, 2].map((index) => plateBlock(index, (index * SWATCH_WIDTH) / 3)),
+      });
+
     case "boundaries":
       // All three boundary colours stacked, since the layer draws all three.
       return new Node({
@@ -108,6 +119,22 @@ export function createLegendSwatch(kind: SwatchKind): Node {
     default:
       return new Node();
   }
+}
+
+/**
+ * One plate of the sample wash. On the map the palette is drawn at
+ * `PLATE_FILL_OPACITY` so the relief shows through; here it is drawn more solidly,
+ * because at eighteen pixels wide over a flat panel that faint a wash would read as
+ * no colour at all.
+ */
+function plateBlock(paletteIndex: number, x: number): Node {
+  const palette = PlateTectonicsColors.platePaletteColorProperties;
+  return new Rectangle(x, 0, SWATCH_WIDTH / 3, SWATCH_HEIGHT, {
+    fill: palette[paletteIndex % palette.length] as (typeof palette)[number],
+    opacity: PLATE_SWATCH_OPACITY,
+    stroke: PlateTectonicsColors.plateOutlineColorProperty,
+    lineWidth: 0.7,
+  });
 }
 
 function boundaryLine(color: (typeof PlateTectonicsColors)["divergentBoundaryColorProperty"], y: number): Node {

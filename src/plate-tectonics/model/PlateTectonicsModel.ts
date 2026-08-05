@@ -12,7 +12,8 @@
  * ── State groups ──────────────────────────────────────────────────────────────
  *  - Layer visibility: which overlays are drawn.
  *  - Earthquake depth filter: which hypocentres are drawn.
- *  - View selection: the global map, or one of the three boundary cross-sections.
+ *  - View selection: the global map — flat or as a 3-D globe — or one of the three
+ *    boundary cross-sections.
  *  - Time: the reconstruction clock, plus play/pause and speed.
  */
 
@@ -39,6 +40,9 @@ export const TIME_RANGE = new Range(-TIME_RANGE_MYR, TIME_RANGE_MYR);
 export class PlateTectonicsModel implements TModel {
   // ── Layer visibility ────────────────────────────────────────────────────────
 
+  /** The per-plate colour wash and plate outlines. */
+  public readonly showPlatesProperty = new BooleanProperty(true);
+
   /** Plate boundaries, colour-coded divergent / convergent / transform. */
   public readonly showBoundariesProperty = new BooleanProperty(true);
 
@@ -64,8 +68,23 @@ export class PlateTectonicsModel implements TModel {
   /** The global map, or one of the boundary cross-sections. */
   public readonly selectedViewProperty = new Property<ViewKey>("global");
 
+  /**
+   * Whether the global view draws the Earth as a rotatable 3-D globe rather than as
+   * the flat equirectangular map. The flat map shows the whole world at once and is
+   * the better place to compare one ocean with another; the globe shows shapes and
+   * distances honestly, which is what makes a circum-Pacific belt of earthquakes look
+   * like a ring rather than a horseshoe smeared across two edges of a rectangle.
+   */
+  public readonly showGlobeProperty = new BooleanProperty(false);
+
   /** True while a cross-section is on screen rather than the global map. */
   public readonly isCrossSectionProperty: TReadOnlyProperty<boolean>;
+
+  /** True while the flat map is on screen. */
+  public readonly isFlatMapProperty: TReadOnlyProperty<boolean>;
+
+  /** True while the 3-D globe is on screen. */
+  public readonly isGlobeProperty: TReadOnlyProperty<boolean>;
 
   // ── Time ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +107,14 @@ export class PlateTectonicsModel implements TModel {
     this.isCrossSectionProperty = new DerivedProperty(
       [this.selectedViewProperty],
       (view: ViewKey) => view !== "global",
+    );
+    this.isGlobeProperty = new DerivedProperty(
+      [this.selectedViewProperty, this.showGlobeProperty],
+      (view: ViewKey, showGlobe: boolean) => view === "global" && showGlobe,
+    );
+    this.isFlatMapProperty = new DerivedProperty(
+      [this.selectedViewProperty, this.showGlobeProperty],
+      (view: ViewKey, showGlobe: boolean) => view === "global" && !showGlobe,
     );
     this.isPresentDayProperty = new DerivedProperty(
       [this.timeMillionsOfYearsProperty],
@@ -142,6 +169,8 @@ export class PlateTectonicsModel implements TModel {
 
   /** Resets all model state to its initial values (the Reset All button). */
   public reset(): void {
+    this.showPlatesProperty.reset();
+    this.showGlobeProperty.reset();
     this.showBoundariesProperty.reset();
     this.showVectorsProperty.reset();
     this.showEarthquakesProperty.reset();

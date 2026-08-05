@@ -8,10 +8,13 @@
     "global": "Global map",
     "subduction": "Subduction zone — Chile trench",
     "divergent": "Spreading ridge — Mid-Atlantic",
-    "transform": "Transform fault — San Andreas"
+    "transform": "Transform fault — San Andreas",
+    "globe": "Show as 3-D globe",
+    "globeHint": "Drag the globe to turn the Earth"
   },
   "layers": {
     "title": "Layers",
+    "plates": "Tectonic plates",
     "plateBoundaries": "Plate boundaries",
     "motionVectors": "Motion vectors",
     "earthquakes": "Earthquakes",
@@ -73,6 +76,7 @@
       "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
       "viewDetails": {
         "global": "The global map is showing.",
+        "globe": "The Earth is showing as a globe, which can be turned to bring any part of it into view.",
         "subduction": "A cross-section through the Chile trench is showing, where the Nazca plate subducts beneath South America.",
         "divergent": "A cross-section through the Mid-Atlantic Ridge is showing, where North America and Africa spread apart.",
         "transform": "A cross-section through the San Andreas fault is showing, where the Pacific and North American plates slide past each other."
@@ -93,6 +97,11 @@
       "controls": {
         "viewSelector": "View",
         "viewSelectorHelp": "Choose the global map or a cross-section through one kind of plate boundary.",
+        "globeToggle": "Show as 3-D globe",
+        "globeToggleHelp": "Draw the global map on a globe that can be turned, instead of a flat rectangular map.",
+        "globe": "Globe",
+        "globeHelp": "Drag the globe to turn the Earth. With the globe focused, the left and right arrow keys move the view east and west, and the up and down arrow keys move it north and south.",
+        "plates": "Tectonic plates",
         "plateBoundaries": "Plate boundaries",
         "motionVectors": "Motion vectors",
         "earthquakes": "Earthquakes",

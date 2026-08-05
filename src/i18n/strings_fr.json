@@ -8,10 +8,13 @@
     "global": "Carte mondiale",
     "subduction": "Zone de subduction — Fosse du Chili",
     "divergent": "Dorsale d'expansion — Atlantique",
-    "transform": "Faille transformante — San Andreas"
+    "transform": "Faille transformante — San Andreas",
+    "globe": "Afficher en globe 3D",
+    "globeHint": "Faites glisser le globe pour faire tourner la Terre"
   },
   "layers": {
     "title": "Couches",
+    "plates": "Plaques tectoniques",
     "plateBoundaries": "Limites de plaques",
     "motionVectors": "Vecteurs de mouvement",
     "earthquakes": "Séismes",
@@ -73,6 +76,7 @@
       "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
       "viewDetails": {
         "global": "La carte mondiale est affichée.",
+        "globe": "La Terre est affichée en globe, que l'on peut faire tourner pour amener n'importe quelle région dans le champ de vision.",
         "subduction": "Une coupe transversale de la fosse du Chili est affichée, où la plaque de Nazca s'enfonce sous l'Amérique du Sud.",
         "divergent": "Une coupe transversale de la dorsale médio-atlantique est affichée, où l'Amérique du Nord et l'Afrique s'écartent.",
         "transform": "Une coupe transversale de la faille de San Andreas est affichée, où les plaques pacifique et nord-américaine glissent l'une contre l'autre."
@@ -93,6 +97,11 @@
       "controls": {
         "viewSelector": "Vue",
         "viewSelectorHelp": "Choisissez la carte mondiale ou une coupe transversale d'un type de limite de plaques.",
+        "globeToggle": "Afficher en globe 3D",
+        "globeToggleHelp": "Dessiner la carte mondiale sur un globe que l'on peut faire tourner, au lieu d'une carte rectangulaire plate.",
+        "globe": "Globe",
+        "globeHelp": "Faites glisser le globe pour faire tourner la Terre. Lorsque le globe est sélectionné, les flèches gauche et droite déplacent la vue vers l'est et vers l'ouest, et les flèches haut et bas la déplacent vers le nord et vers le sud.",
+        "plates": "Plaques tectoniques",
         "plateBoundaries": "Limites de plaques",
         "motionVectors": "Vecteurs de mouvement",
         "earthquakes": "Séismes",

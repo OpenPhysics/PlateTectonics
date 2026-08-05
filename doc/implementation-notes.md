@@ -10,7 +10,10 @@ src/
   PlateTectonicsColors.ts        every ProfileColorProperty (default + projector)
   PlateTectonicsConstants.ts     layout px, Earth-science quantities, time range
   common/
+    EarthProjection.ts           the interface both projections implement
     MapProjection.ts             equirectangular lon/lat ↔ view
+    GlobeProjection.ts           orthographic lon/lat ↔ view, with a camera
+    attachGlobeRotation.ts       drag + arrow keys → the globe's camera
     PlateReconstruction.ts       Euler-pole rotation and plate velocities
     data/
       dataTypes.ts               shapes of every dataset (hand-written)
@@ -22,7 +25,9 @@ src/
       EarthquakeDepthFilter.ts   depth bands and the filter predicate
     view/
       PlateTectonicsScreenView.ts  layout, view switching, relief loading, pdomOrder
-      MapCanvasNode.ts             the global map (canvas)
+      EarthCanvasNode.ts           the layers both global views share (canvas)
+      MapCanvasNode.ts             the flat global map
+      GlobeCanvasNode.ts           the 3-D globe
       PlateOverlayNode.ts          plate labels and motion arrows (Scenery nodes)
       CrossSectionNode.ts          a section: canvas + localized annotations
       CrossSectionCanvasNode.ts    the painted section
@@ -77,6 +82,46 @@ boundary tears apart correctly under reconstruction — Baja California rides th
 plate away from North America. The outline is broken at those tears (the fill still
 spans them) so the torn edge does not leave a stray line across the ocean.
 
+## Drawing a sphere as a sphere
+
+The **3-D globe** (`GlobeCanvasNode`, off by default) is the same layers in the same
+order and the same colours; only the projection differs. Both views are written against
+`EarthProjection`, whose `project` returns *whether* a point can be seen as well as
+where it goes — always true on the flat map, and false for the far hemisphere on the
+globe. Everything that draws geography goes through it, including `PlateOverlayNode`,
+which is instantiated once per projection.
+
+`GlobeProjection` is plain orthographic (Snyder pp. 145–153) with the camera stored as
+the longitude and latitude at the centre of the disc, so dragging is just moving that
+point. It also inverts, which is how the equirectangular relief raster gets onto a
+disc: each pixel is un-projected and sampled, into a texture rebuilt only when the
+camera moves.
+
+The rectangle's problems (the antimeridian, circumpolar rings) vanish; three of its own
+take their place, all in `GlobeCanvasNode`:
+
+1. **The limb.** Polylines are cut where they cross it — the crossing is found by
+   interpolating on `GlobeProjection.depth`, which changes sign exactly there. Filled
+   outlines cannot simply be cut, so where one dips behind the limb it detours to a
+   ring outside the disc, skirts round to where it reappears and drops back in; the
+   disc clip trims the detour into a clean round edge. (This is NAAP's trick, by way of
+   `BasicCoordinatesAndSeasons`.)
+2. **Long segments.** The datasets were shaped for a flat map, where a straight line
+   between vertices is right and a long one is harmless — the Pacific plate's eastern
+   edge climbs 66° of latitude in a single step. On a globe that step is a chord
+   straight through the Earth, so segments are sampled along their great circle every
+   5°, which puts them back on the surface where the limb can hide them.
+3. **Dataset seams.** A plate that straddles the antimeridian is stored slit open along
+   ±180°, and one that reaches a pole is closed off along the pole — fourteen such
+   segments in `PLATES`, plus two polar ones. On the flat map they fall exactly on the
+   edge of the viewport and are never seen; on a globe the antimeridian is an ordinary
+   meridian, so they are filled but not stroked.
+
+Motion arrows differ too, and the difference belongs to the projection: `bearing` on
+the flat map draws the compass azimuth as a screen angle ("the Nazca plate moves
+east"), while on the globe it steps along the bearing across the sphere and projects
+both ends, because north is only "up" at the centre of the disc.
+
 ## The data pipeline
 
 `npm run build-data` is the only thing that touches the network. It writes
@@ -121,7 +166,8 @@ Generated files are excluded from Biome (see `biome.json`) and formatted by
 | `PlateReconstruction.test.ts` | Euler-pole rotation, round trips, and plate speeds against published values |
 | `PlateTectonicsModel.test.ts` | layer state, depth bands, the time clock and reset |
 | `CrossSectionGeometry.test.ts` | the two-band layout, crust switching, slab fitting, ridge cooling |
-| `MapProjection.test.ts` | projection round trips and the 2:1 viewport |
+| `MapProjection.test.ts` | projection round trips, the 2:1 viewport, motion-arrow bearings |
+| `GlobeProjection.test.ts` | orthographic projection and its inverse, visibility, bearings, the camera |
 | `geophysicalData.test.ts` | integrity of every generated dataset, plus a few facts about the Earth |
 | `memory-leak.test.ts` | WeakRef + forced GC on disposables |
 

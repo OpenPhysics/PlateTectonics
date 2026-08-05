@@ -20,7 +20,10 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/PlateTectonicsConstants.ts` | Layout px, Earth-science quantities, geological-time range |
 | `src/PlateTectonicsNamespace.ts` | Namespace for color property names |
 | `src/i18n/StringManager.ts` | Singleton localized string accessor |
+| `src/common/EarthProjection.ts` | The interface both projections implement |
 | `src/common/MapProjection.ts` | Equirectangular lon/lat ↔ view |
+| `src/common/GlobeProjection.ts` | Orthographic lon/lat ↔ view, plus the globe's camera |
+| `src/common/attachGlobeRotation.ts` | Drag and arrow keys → the globe's camera |
 | `src/common/PlateReconstruction.ts` | Euler-pole rotation and plate velocities |
 | `src/common/data/dataTypes.ts` | Shapes of every dataset (hand-written) |
 | `src/common/data/hotspots.ts` | Hand-maintained hotspot list |
@@ -28,7 +31,9 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/plate-tectonics/model/PlateTectonicsModel.ts` | All AXON state |
 | `src/plate-tectonics/model/EarthquakeDepthFilter.ts` | Depth bands and the filter predicate |
 | `src/plate-tectonics/view/PlateTectonicsScreenView.ts` | Layout, view switching, `pdomOrder` |
-| `src/plate-tectonics/view/MapCanvasNode.ts` | The global map (canvas painting) |
+| `src/plate-tectonics/view/EarthCanvasNode.ts` | The layers both global views share (canvas painting) |
+| `src/plate-tectonics/view/MapCanvasNode.ts` | The flat global map |
+| `src/plate-tectonics/view/GlobeCanvasNode.ts` | The 3-D globe |
 | `src/plate-tectonics/view/PlateOverlayNode.ts` | Plate labels + motion arrows |
 | `src/plate-tectonics/view/CrossSectionGeometry.ts` | Profile → view coords, slab fitting |
 | `src/plate-tectonics/view/CrossSectionCanvasNode.ts` | The painted cross-section |
@@ -62,6 +67,22 @@ Sphere-on-a-rectangle hazards (antimeridian wrapping, circumpolar rings, ring cl
 coastlines tearing at plate boundaries) are all handled in
 `MapCanvasNode.appendPolyline`. Read its comments before touching it; each rule is
 there because of a specific artifact.
+
+The global map is drawn either flat or as a rotatable 3-D globe, from the same data.
+`EarthCanvasNode` owns what they share — which layers exist, in what order, in what
+colours — and each subclass supplies only what depends on the shape of the world: the
+clip, the base map, and how a polyline of lon/lat becomes a canvas path. Anything that
+draws geography (including `PlateOverlayNode`) is written against the `EarthProjection`
+interface, whose `project` reports *whether* a point is visible as well as where it
+goes. **A new layer added to `EarthCanvasNode` appears on both views for free; one
+added to a subclass appears on only one, which is almost never what is wanted.**
+
+Sphere-on-a-disc hazards — cutting at the limb, closing a fill that runs round the
+back, 66°-long segments drawn as chords through the Earth, and the antimeridian seams
+the dataset was cut along — are all handled in `GlobeCanvasNode`, and documented in
+[`doc/implementation-notes.md`](doc/implementation-notes.md). The globe's camera lives
+in the *view* (`PlateTectonicsScreenView` resets it), because it is a camera, not
+physics; `showGlobeProperty` is model state because it is a choice about what is shown.
 
 ### Colors
 
@@ -131,7 +152,8 @@ A11y strings live under `a11y.plateTectonics` in each locale JSON, exposed via
 | `tests/PlateReconstruction.test.ts` | Euler-pole rotation; plate speeds against published values |
 | `tests/PlateTectonicsModel.test.ts` | Layer state, depth bands, time clock, reset |
 | `tests/CrossSectionGeometry.test.ts` | Two-band layout, crust switching, slab fitting, ridge cooling |
-| `tests/MapProjection.test.ts` | Projection round trips, 2:1 viewport |
+| `tests/MapProjection.test.ts` | Projection round trips, 2:1 viewport, motion-arrow bearings |
+| `tests/GlobeProjection.test.ts` | Orthographic projection and its inverse, visibility, bearings, camera |
 | `tests/geophysicalData.test.ts` | Integrity of the generated datasets |
 | `tests/memory-leak.test.ts` | WeakRef + `forceGC` dispose regression |
 

@@ -12,8 +12,12 @@ import { depthBand, passesDepthFilter } from "../src/plate-tectonics/model/Earth
 import { PlateTectonicsModel, TIME_RANGE } from "../src/plate-tectonics/model/PlateTectonicsModel.js";
 
 describe("PlateTectonicsModel", () => {
-  it("starts with every layer on, at the present day, on the global map", () => {
+  it("starts with every layer on, at the present day, on the flat global map", () => {
     const model = new PlateTectonicsModel();
+    expect(model.showPlatesProperty.value).toBe(true);
+    expect(model.showGlobeProperty.value).toBe(false);
+    expect(model.isFlatMapProperty.value).toBe(true);
+    expect(model.isGlobeProperty.value).toBe(false);
     expect(model.showBoundariesProperty.value).toBe(true);
     expect(model.showVectorsProperty.value).toBe(true);
     expect(model.showEarthquakesProperty.value).toBe(true);
@@ -33,6 +37,29 @@ describe("PlateTectonicsModel", () => {
     expect(model.isCrossSectionProperty.value).toBe(true);
     model.selectedViewProperty.value = "global";
     expect(model.isCrossSectionProperty.value).toBe(false);
+  });
+
+  it("shows exactly one of the flat map, the globe and a cross-section", () => {
+    const model = new PlateTectonicsModel();
+    const shown = (): string[] =>
+      [
+        model.isFlatMapProperty.value ? "flat" : null,
+        model.isGlobeProperty.value ? "globe" : null,
+        model.isCrossSectionProperty.value ? "section" : null,
+      ].filter((name): name is string => name !== null);
+
+    expect(shown()).toEqual(["flat"]);
+
+    model.showGlobeProperty.value = true;
+    expect(shown()).toEqual(["globe"]);
+
+    // A cross-section is a slice through the Earth, so it wins over both — and the
+    // globe setting is remembered for when the global map comes back.
+    model.selectedViewProperty.value = "subduction";
+    expect(shown()).toEqual(["section"]);
+
+    model.selectedViewProperty.value = "global";
+    expect(shown()).toEqual(["globe"]);
   });
 
   it("does not advance geological time while paused", () => {
@@ -97,6 +124,8 @@ describe("PlateTectonicsModel", () => {
 
   it("reset() restores every property", () => {
     const model = new PlateTectonicsModel();
+    model.showPlatesProperty.value = false;
+    model.showGlobeProperty.value = true;
     model.showBoundariesProperty.value = false;
     model.showVectorsProperty.value = false;
     model.showEarthquakesProperty.value = false;
@@ -109,6 +138,8 @@ describe("PlateTectonicsModel", () => {
 
     model.reset();
 
+    expect(model.showPlatesProperty.value).toBe(true);
+    expect(model.showGlobeProperty.value).toBe(false);
     expect(model.showBoundariesProperty.value).toBe(true);
     expect(model.showVectorsProperty.value).toBe(true);
     expect(model.showEarthquakesProperty.value).toBe(true);

@@ -52,6 +52,26 @@ export const VOLCANO_MARKER_SIZE = 3.4;
 /** Length in view pixels of a motion vector representing 100 mm/year. */
 export const VELOCITY_VECTOR_SCALE = 26;
 
+// ── Globe rendering ───────────────────────────────────────────────────────────
+
+/**
+ * Gap in view pixels between the globe's limb and the nearest edge of the
+ * viewport, so the disc never touches the frame.
+ */
+export const GLOBE_RADIUS_MARGIN = 6;
+
+/**
+ * The point the globe faces when it opens, and returns to on Reset All. Centred on
+ * the Atlantic so the Mid-Atlantic Ridge — the clearest divergent boundary in the
+ * dataset — runs straight down the middle of the disc, with the Americas and Africa
+ * either side of it.
+ */
+export const GLOBE_INITIAL_CENTER_LON = -30;
+export const GLOBE_INITIAL_CENTER_LAT = 15;
+
+/** Degrees the globe turns per press of an arrow key. */
+export const GLOBE_KEYBOARD_STEP_DEGREES = 5;
+
 // ── Earth science ─────────────────────────────────────────────────────────────
 
 /** Mean radius of the Earth, km. */
@@ -115,6 +135,10 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   QUAKE_RADIUS_PER_MAGNITUDE,
   VOLCANO_MARKER_SIZE,
   VELOCITY_VECTOR_SCALE,
+  GLOBE_RADIUS_MARGIN,
+  GLOBE_INITIAL_CENTER_LON,
+  GLOBE_INITIAL_CENTER_LAT,
+  GLOBE_KEYBOARD_STEP_DEGREES,
   EARTH_RADIUS_KM,
   SHALLOW_DEPTH_LIMIT_KM,
   INTERMEDIATE_DEPTH_LIMIT_KM,

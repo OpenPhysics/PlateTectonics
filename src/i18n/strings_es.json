@@ -8,10 +8,13 @@
     "global": "Mapa global",
     "subduction": "Zona de subducción — Fosa de Chile",
     "divergent": "Dorsal de expansión — Atlántico Medio",
-    "transform": "Falla transformante — San Andrés"
+    "transform": "Falla transformante — San Andrés",
+    "globe": "Mostrar como globo 3D",
+    "globeHint": "Arrastre el globo para girar la Tierra"
   },
   "layers": {
     "title": "Capas",
+    "plates": "Placas tectónicas",
     "plateBoundaries": "Límites de placas",
     "motionVectors": "Vectores de movimiento",
     "earthquakes": "Terremotos",
@@ -73,6 +76,7 @@
       "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
       "viewDetails": {
         "global": "Se muestra el mapa global.",
+        "globe": "La Tierra se muestra como un globo, que puede girarse para traer cualquier región al campo de visión.",
         "subduction": "Se muestra un corte transversal de la fosa de Chile, donde la placa de Nazca subduce bajo América del Sur.",
         "divergent": "Se muestra un corte transversal de la dorsal Mesoatlántica, donde América del Norte y África se separan.",
         "transform": "Se muestra un corte transversal de la falla de San Andrés, donde las placas del Pacífico y Norteamericana se deslizan una junto a la otra."
@@ -93,6 +97,11 @@
       "controls": {
         "viewSelector": "Vista",
         "viewSelectorHelp": "Elija el mapa global o un corte transversal de un tipo de límite de placas.",
+        "globeToggle": "Mostrar como globo 3D",
+        "globeToggleHelp": "Dibujar el mapa global sobre un globo que puede girarse, en lugar de un mapa rectangular plano.",
+        "globe": "Globo",
+        "globeHelp": "Arrastre el globo para girar la Tierra. Con el globo seleccionado, las flechas izquierda y derecha mueven la vista hacia el este y el oeste, y las flechas arriba y abajo la mueven hacia el norte y el sur.",
+        "plates": "Placas tectónicas",
         "plateBoundaries": "Límites de placas",
         "motionVectors": "Vectores de movimiento",
         "earthquakes": "Terremotos",

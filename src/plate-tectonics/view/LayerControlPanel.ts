@@ -41,6 +41,12 @@ export class LayerControlPanel extends PlateTectonicsPanel {
 
     const checkboxes = [
       {
+        property: model.showPlatesProperty,
+        label: layerStrings.platesStringProperty,
+        accessibleName: a11y.platesStringProperty,
+        swatch: createLegendSwatch("plates"),
+      },
+      {
         property: model.showBoundariesProperty,
         label: layerStrings.plateBoundariesStringProperty,
         accessibleName: a11y.plateBoundariesStringProperty,

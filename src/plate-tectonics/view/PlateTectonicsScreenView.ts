@@ -14,16 +14,19 @@
  *   │                                    reset │               │
  *   └──────────────────────────────────────────┴───────────────┘
  *
- * The global map and the cross-section share one viewport; the view selector swaps
- * which of them is visible. The relief raster is fetched here, once, and handed to
- * the map canvas when it has decoded.
+ * The flat map, the globe and the cross-section share one viewport; the view selector
+ * and the globe checkbox decide which of the three is visible. The relief raster is
+ * fetched here, once, and handed to both map canvases when it has decoded.
  */
 
+import { Shape } from "scenerystack/kite";
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
-import { Node, Rectangle, Text } from "scenerystack/scenery";
+import { Circle, Node, Rectangle, Text } from "scenerystack/scenery";
 import { PhetFont, ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
+import { attachGlobeRotation } from "../../common/attachGlobeRotation.js";
 import reliefImageUrl from "../../common/data/generated/relief.png";
+import { GlobeProjection } from "../../common/GlobeProjection.js";
 import { MapProjection } from "../../common/MapProjection.js";
 import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/PlateTectonicsButtonOptions.js";
 import { StringManager } from "../../i18n/StringManager.js";
@@ -32,6 +35,7 @@ import { MAP_VIEW_BOUNDS, PANEL_SPACING, SCREEN_VIEW_MARGIN } from "../../PlateT
 import type { PlateTectonicsPreferencesModel } from "../../preferences/PlateTectonicsPreferencesModel.js";
 import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
 import { CrossSectionNode } from "./CrossSectionNode.js";
+import { GlobeCanvasNode } from "./GlobeCanvasNode.js";
 import { LayerControlPanel } from "./LayerControlPanel.js";
 import { MapCanvasNode } from "./MapCanvasNode.js";
 import { MapLegendNode } from "./MapLegendNode.js";
@@ -47,6 +51,8 @@ export type PlateTectonicsScreenViewOptions = ScreenViewOptions;
 
 export class PlateTectonicsScreenView extends ScreenView {
   private readonly mapCanvas: MapCanvasNode;
+  private readonly globeCanvas: GlobeCanvasNode;
+  private readonly globeProjection: GlobeProjection;
 
   public constructor(
     model: PlateTectonicsModel,
@@ -60,12 +66,39 @@ export class PlateTectonicsScreenView extends ScreenView {
     super(options);
 
     const strings = StringManager.getInstance();
+    const a11y = strings.getPlateTectonicsA11yStrings().controls;
     const projection = new MapProjection(MAP_VIEW_BOUNDS);
+    this.globeProjection = new GlobeProjection(MAP_VIEW_BOUNDS);
 
     // ── Viewport ──────────────────────────────────────────────────────────────
+    // Three things share the viewport: the flat map, the globe, and a cross-section.
+    // Each carries its own plate-label overlay, because the labels are positioned by
+    // the projection they belong to.
     this.mapCanvas = new MapCanvasNode(model, projection);
-    const plateOverlay = new PlateOverlayNode(model, projection);
-    const globalView = new Node({ children: [this.mapCanvas, plateOverlay] });
+    const flatOverlay = new PlateOverlayNode(model, projection);
+    const flatView = new Node({ children: [this.mapCanvas, flatOverlay] });
+
+    this.globeCanvas = new GlobeCanvasNode(model, this.globeProjection);
+    const globeOverlay = new PlateOverlayNode(model, this.globeProjection);
+    const globeLimb = new Circle(this.globeProjection.radius, {
+      center: MAP_VIEW_BOUNDS.center,
+      stroke: PlateTectonicsColors.mapFrameColorProperty,
+      lineWidth: 1.5,
+    });
+    const globeView = attachGlobeRotation(new Node({ children: [this.globeCanvas, globeLimb, globeOverlay] }), {
+      projection: this.globeProjection,
+      accessibleNameProperty: a11y.globeStringProperty,
+      accessibleHelpTextProperty: a11y.globeHelpStringProperty,
+    });
+    // Only the disc takes the drag, so a pointer on the empty corners of the viewport
+    // is not silently grabbing a globe that is not there.
+    const globeDiscShape = Shape.circle(MAP_VIEW_BOUNDS.centerX, MAP_VIEW_BOUNDS.centerY, this.globeProjection.radius);
+    globeView.mouseArea = globeDiscShape;
+    globeView.touchArea = globeDiscShape;
+    // ...and the focus highlight traces the same disc, so a keyboard user is shown the
+    // globe rather than the empty rectangle it sits in.
+    globeView.focusHighlight = globeDiscShape;
+
     const crossSectionView = new CrossSectionNode(model, MAP_VIEW_BOUNDS);
 
     const viewportFrame = new Rectangle(MAP_VIEW_BOUNDS, {
@@ -74,16 +107,23 @@ export class PlateTectonicsScreenView extends ScreenView {
       cornerRadius: 2,
     });
 
-    this.addChild(globalView);
+    this.addChild(flatView);
+    this.addChild(globeView);
     this.addChild(crossSectionView);
     this.addChild(viewportFrame);
 
+    model.isFlatMapProperty.link((isFlatMap: boolean) => {
+      flatView.visible = isFlatMap;
+    });
+    model.isGlobeProperty.link((isGlobe: boolean) => {
+      globeView.visible = isGlobe;
+    });
     model.isCrossSectionProperty.link((isCrossSection: boolean) => {
-      globalView.visible = !isCrossSection;
       crossSectionView.visible = isCrossSection;
     });
     preferences.showPlateLabelsProperty.link((showLabels: boolean) => {
-      plateOverlay.visible = showLabels;
+      flatOverlay.visible = showLabels;
+      globeOverlay.visible = showLabels;
     });
 
     // ── Title and reconstruction note ─────────────────────────────────────────
@@ -155,27 +195,37 @@ export class PlateTectonicsScreenView extends ScreenView {
     this.loadReliefImage();
 
     // ── Accessibility: keyboard / reading traversal order ─────────────────────
+    // The globe comes first: it is the only thing in the play area that can be
+    // operated, so a keyboard user should reach it before the controls.
     this.addChild(
       new Node({
-        pdomOrder: [viewPanel.comboBox, ...layerPanel.focusOrder, ...timePanel.focusOrder, resetAllButton],
+        pdomOrder: [
+          globeView,
+          ...viewPanel.focusOrder,
+          ...layerPanel.focusOrder,
+          ...timePanel.focusOrder,
+          resetAllButton,
+        ],
       }),
     );
   }
 
   /**
-   * Loads the shaded relief raster and hands it to the map once it has decoded.
-   * The map draws a flat ocean until then, so a slow load never blocks the sim.
+   * Loads the shaded relief raster and hands it to both map views once it has
+   * decoded. They draw a plain ocean until then, so a slow load never blocks the sim.
    */
   private loadReliefImage(): void {
     const image = new window.Image();
-    image.addEventListener("load", () => this.mapCanvas.setReliefImage(image));
+    image.addEventListener("load", () => {
+      this.mapCanvas.setReliefImage(image);
+      this.globeCanvas.setReliefImage(image);
+    });
     image.src = reliefImageUrl;
   }
 
-  /** Resets view-side state. All state that matters lives in the model. */
+  /** Resets view-side state: only the globe's camera, which is not model state. */
   public reset(): void {
-    // Nothing view-only to reset: layer visibility, the view selection and the
-    // reconstruction clock are all model state.
+    this.globeProjection.reset();
   }
 
   /**

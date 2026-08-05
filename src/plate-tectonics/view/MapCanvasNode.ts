@@ -79,15 +79,16 @@ export class MapCanvasNode extends EarthCanvasNode {
   protected override appendFeature(
     context: CanvasRenderingContext2D,
     coords: readonly number[],
-    plateIndices: number | readonly number[],
+    frames: number | readonly number[],
     mode: RingMode,
+    tearAtFrameChanges = false,
   ): void {
-    this.appendPolyline(context, coords, plateIndices, mode, 0);
+    this.appendPolyline(context, coords, frames, mode, tearAtFrameChanges, 0);
     if (this.wrapped) {
       // The feature runs off one side of the map, so repeat it a world-width either
       // way; the clip keeps whichever copy is on screen.
-      this.appendPolyline(context, coords, plateIndices, mode, -this.mapBounds.width);
-      this.appendPolyline(context, coords, plateIndices, mode, this.mapBounds.width);
+      this.appendPolyline(context, coords, frames, mode, tearAtFrameChanges, -this.mapBounds.width);
+      this.appendPolyline(context, coords, frames, mode, tearAtFrameChanges, this.mapBounds.width);
     }
   }
 
@@ -103,17 +104,18 @@ export class MapCanvasNode extends EarthCanvasNode {
   private appendPolyline(
     context: CanvasRenderingContext2D,
     coords: readonly number[],
-    plateIndices: number | readonly number[],
+    frames: number | readonly number[],
     mode: RingMode,
+    tearAtFrameChanges: boolean,
     offsetX: number,
   ): void {
-    const perVertex = typeof plateIndices !== "number";
+    const perVertex = typeof frames !== "number";
     // Once the plates are moved, two neighbouring coastline vertices that ride
     // different plates end up hundreds of kilometres apart. The polygon still has
     // to be filled across that gap, but drawing the outline across it would leave a
     // stray line over the ocean, so the outline is broken there instead.
-    const breakAtPlateChanges = perVertex && mode !== "fill" && !this.reconstruction.isPresentDay;
-    let previousPlateIndex = -1;
+    const breakAtFrameChanges = tearAtFrameChanges && perVertex && mode !== "fill" && !this.reconstruction.isPresentDay;
+    let previousFrame = -1;
     let previousLon = Number.NaN;
     let turns = 0;
     let firstX = 0;
@@ -127,8 +129,8 @@ export class MapCanvasNode extends EarthCanvasNode {
 
     for (let i = 0; i < coords.length; i += 2) {
       const vertex = i / 2;
-      const plateIndex = perVertex ? ((plateIndices[vertex] as number) ?? 0) : plateIndices;
-      this.reconstruction.transform(coords[i] as number, coords[i + 1] as number, plateIndex);
+      const frame = perVertex ? ((frames[vertex] as number) ?? 0) : frames;
+      this.reconstruction.transform(coords[i] as number, coords[i + 1] as number, frame);
 
       let lon = this.reconstruction.lon + turns * 360;
       if (vertex > 0 && Math.abs(lon - previousLon) > ANTIMERIDIAN_JUMP) {
@@ -143,12 +145,12 @@ export class MapCanvasNode extends EarthCanvasNode {
       if (vertex === 0) {
         context.moveTo(x, y);
         firstX = x;
-      } else if (breakAtPlateChanges && plateIndex !== previousPlateIndex) {
+      } else if (breakAtFrameChanges && frame !== previousFrame) {
         context.moveTo(x, y);
       } else {
         context.lineTo(x, y);
       }
-      previousPlateIndex = plateIndex;
+      previousFrame = frame;
       lastX = x;
       latitudeSum += this.reconstruction.lat;
       minLon = Math.min(minLon, lon);

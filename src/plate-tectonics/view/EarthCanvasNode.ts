@@ -155,15 +155,21 @@ export abstract class EarthCanvasNode extends CanvasNode {
    * ring, or stroked as an open line.
    *
    * @param coords - flat `[lon, lat, …]` array in degrees
-   * @param plateIndices - a single plate index for the whole feature, or one per
-   * vertex (coastlines use the per-vertex form so a coastline that straddles a
-   * boundary tears apart correctly under reconstruction)
+   * @param frames - a single motion frame for the whole feature, or one per vertex
+   * (see `PlateReconstruction.MOTION_FRAMES`)
+   * @param mode - how the traced path is about to be used
+   * @param tearAtFrameChanges - whether to break the outline where consecutive
+   * vertices ride different frames. True for coastlines, which really are cut where
+   * a plate boundary crosses them — Baja California leaves the mainland behind. False
+   * for plate outlines, whose vertices change frame at every triple junction while
+   * the outline itself stays a single closed ring.
    */
   protected abstract appendFeature(
     context: CanvasRenderingContext2D,
     coords: readonly number[],
-    plateIndices: number | readonly number[],
+    frames: number | readonly number[],
     mode: RingMode,
+    tearAtFrameChanges?: boolean,
   ): void;
 
   // ── Base map ────────────────────────────────────────────────────────────────
@@ -173,7 +179,7 @@ export abstract class EarthCanvasNode extends CanvasNode {
     context.fillStyle = PlateTectonicsColors.landColorProperty.value.toCSS();
     for (const ring of LAND_RINGS) {
       context.beginPath();
-      this.appendFeature(context, ring.coords, ring.plateIndices, "fill");
+      this.appendFeature(context, ring.coords, ring.plateIndices, "fill", true);
       context.fill();
     }
 
@@ -181,14 +187,22 @@ export abstract class EarthCanvasNode extends CanvasNode {
     context.lineWidth = 0.6;
     for (const ring of LAND_RINGS) {
       context.beginPath();
-      this.appendFeature(context, ring.coords, ring.plateIndices, "stroke");
+      this.appendFeature(context, ring.coords, ring.plateIndices, "stroke", true);
       context.stroke();
     }
   }
 
   // ── Plates ──────────────────────────────────────────────────────────────────
 
-  /** Washes each plate in its palette colour and outlines it. */
+  /**
+   * Washes each plate in its palette colour and outlines it.
+   *
+   * The outline vertices ride the boundaries beneath them rather than the plate
+   * itself (`PlateRecord.ringFrames`), which is what keeps neighbouring plates
+   * edge to edge while the clock runs instead of overlapping and leaving gaps. A
+   * plate therefore changes shape as well as position: it gains area along its
+   * spreading ridges and loses it at its trenches.
+   */
   protected paintPlates(context: CanvasRenderingContext2D): void {
     const palette = PlateTectonicsColors.platePaletteColorProperties;
 
@@ -197,22 +211,22 @@ export abstract class EarthCanvasNode extends CanvasNode {
       const plate = PLATES[index] as (typeof PLATES)[number];
       const paletteColor = palette[index % palette.length] as (typeof palette)[number];
       context.fillStyle = paletteColor.value.toCSS();
-      for (const ring of plate.rings) {
+      plate.rings.forEach((ring, ringIndex) => {
         context.beginPath();
-        this.appendFeature(context, ring, index, "fill");
+        this.appendFeature(context, ring, plate.ringFrames[ringIndex] as readonly number[], "fill");
         context.fill();
-      }
+      });
     }
     context.globalAlpha = 1;
 
     context.strokeStyle = PlateTectonicsColors.plateOutlineColorProperty.value.toCSS();
     context.lineWidth = 0.7;
-    for (let index = 0; index < PLATES.length; index++) {
-      for (const ring of (PLATES[index] as (typeof PLATES)[number]).rings) {
+    for (const plate of PLATES) {
+      plate.rings.forEach((ring, ringIndex) => {
         context.beginPath();
-        this.appendFeature(context, ring, index, "stroke");
+        this.appendFeature(context, ring, plate.ringFrames[ringIndex] as readonly number[], "stroke");
         context.stroke();
-      }
+      });
     }
   }
 
@@ -231,7 +245,7 @@ export abstract class EarthCanvasNode extends CanvasNode {
         if (segment.type !== type) {
           continue;
         }
-        this.appendFeature(context, segment.coords, segment.plateIndex, "open");
+        this.appendFeature(context, segment.coords, segment.frameIndex, "open");
       }
       context.stroke();
     }

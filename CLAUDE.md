@@ -24,10 +24,11 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/common/MapProjection.ts` | Equirectangular lon/lat ↔ view |
 | `src/common/GlobeProjection.ts` | Orthographic lon/lat ↔ view, plus the globe's camera |
 | `src/common/attachGlobeRotation.ts` | Drag and arrow keys → the globe's camera |
-| `src/common/PlateReconstruction.ts` | Euler-pole rotation and plate velocities |
+| `src/common/PlateReconstruction.ts` | Euler-pole rotation, plate velocities, `MOTION_FRAMES` |
 | `src/common/data/dataTypes.ts` | Shapes of every dataset (hand-written) |
 | `src/common/data/hotspots.ts` | Hand-maintained hotspot list |
 | `src/common/data/generated/` | **Generated — do not edit.** `npm run build-data` owns it |
+| `src/common/data/generated/motionFrameData.ts` | Rotations belonging to boundaries rather than plates |
 | `src/plate-tectonics/model/PlateTectonicsModel.ts` | All AXON state |
 | `src/plate-tectonics/model/EarthquakeDepthFilter.ts` | Depth bands and the filter predicate |
 | `src/plate-tectonics/view/PlateTectonicsScreenView.ts` | Layout, view switching, `pdomOrder` |
@@ -55,6 +56,26 @@ keyed by URL hash, so re-runs are fast and a changed query parameter re-fetches.
 integrity and a few facts about the Earth (deep earthquakes cluster around the
 Pacific; the Chile profile's deep events sit inland of its shallow ones). Run
 `npm test` after any regeneration.
+
+`npm run build-data` with no arguments rebuilds everything. Naming steps —
+`plate-model`, `land`, `earthquakes`, `volcanoes`, `relief`, `cross-sections` —
+rebuilds only those, which is how the PB2002 model can be regenerated without also
+pulling a newer earthquake catalogue and a fresh DEM into an unrelated diff.
+`plate-model` covers the plates, their boundaries and the motion frames together,
+because those three index into each other.
+
+### What moves when the clock runs
+
+Only `timeMillionsOfYearsProperty` evolves, and `PlateReconstruction` turns it into a
+rotation per **motion frame** — `MOTION_FRAMES` is the plates first (so a plate index
+is a frame index) then the rotations derived for the boundaries. Anything inside a
+plate rides that plate; a boundary rides the mean of its two plates, or the overriding
+plate at a trench; a plate *outline* rides a positional blend of the boundaries near
+it, which is what keeps neighbouring plates edge to edge instead of overlapping and
+gapping. The rules and their justification are in
+[`doc/model.md`](doc/model.md#what-carries-what) — read it before changing what any
+feature rides, and note that a frame index is **not** interchangeable with a plate
+index outside the first `PLATES.length` entries.
 
 ### Rendering
 
@@ -150,6 +171,7 @@ A11y strings live under `a11y.plateTectonics` in each locale JSON, exposed via
 | Path | Purpose |
 |---|---|
 | `tests/PlateReconstruction.test.ts` | Euler-pole rotation; plate speeds against published values |
+| `tests/PlateEvolution.test.ts` | The mosaic staying closed; what each boundary rides; plate areas |
 | `tests/PlateTectonicsModel.test.ts` | Layer state, depth bands, time clock, reset |
 | `tests/CrossSectionGeometry.test.ts` | Two-band layout, crust switching, slab fitting, ridge cooling |
 | `tests/MapProjection.test.ts` | Projection round trips, 2:1 viewport, motion-arrow bearings |

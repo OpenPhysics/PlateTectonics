@@ -19,6 +19,7 @@ import { LAND_RINGS } from "../src/common/data/generated/landData.js";
 import { PLATES } from "../src/common/data/generated/plateData.js";
 import { VOLCANOES } from "../src/common/data/generated/volcanoData.js";
 import { HOTSPOTS } from "../src/common/data/hotspots.js";
+import { MOTION_FRAMES, PlateReconstruction } from "../src/common/PlateReconstruction.js";
 import { MAX_EARTHQUAKE_DEPTH_KM } from "../src/PlateTectonicsConstants.js";
 
 const BOUNDARY_TYPES: readonly BoundaryType[] = ["divergent", "convergent", "transform"];
@@ -48,13 +49,44 @@ describe("plates", () => {
       expect(plate.poleRateDegPerMyr).toBeGreaterThanOrEqual(0);
       expect(plate.poleRateDegPerMyr).toBeLessThan(60);
       expect(plate.rings.length).toBeGreaterThan(0);
-      for (const ring of plate.rings) {
+      expect(plate.ringFrames.length).toBe(plate.rings.length);
+      plate.rings.forEach((ring, index) => {
         expectValidCoordinates(ring);
         // Rings repeat their first vertex at the end; the renderer relies on it.
         expect(ring[0]).toBe(ring[ring.length - 2]);
         expect(ring[1]).toBe(ring[ring.length - 1]);
-      }
+
+        // One motion frame per vertex, and the repeated vertex repeats its frame too,
+        // or the ring would not close once the clock runs.
+        const frames = plate.ringFrames[index] as readonly number[];
+        expect(frames.length).toBe(ring.length / 2);
+        expect(frames[0]).toBe(frames[frames.length - 1]);
+        for (const frame of frames) {
+          expect(frame).toBeGreaterThanOrEqual(0);
+          expect(frame).toBeLessThan(MOTION_FRAMES.length);
+        }
+      });
     }
+  });
+
+  it("pins nearly every outline vertex to a boundary rather than to its own plate", () => {
+    let onOwnPlate = 0;
+    let total = 0;
+    PLATES.forEach((plate, plateIndex) => {
+      for (const frames of plate.ringFrames) {
+        for (const frame of frames) {
+          total++;
+          if (frame === plateIndex) {
+            onOwnPlate++;
+          }
+        }
+      }
+    });
+    // A vertex keeps its own plate's motion only where there is no boundary beneath
+    // it — the seam a polygon is cut along at the antimeridian — or where the plate
+    // genuinely is the overriding side of a trench.
+    expect(total).toBeGreaterThan(1000);
+    expect(onOwnPlate / total).toBeLessThan(0.15);
   });
 
   it("labels the plates a student is expected to name", () => {
@@ -86,8 +118,8 @@ describe("plate boundaries", () => {
       expect(BOUNDARY_TYPES).toContain(segment.type);
       expect(segment.coords.length).toBeGreaterThanOrEqual(4);
       expectValidCoordinates(segment.coords);
-      expect(segment.plateIndex).toBeGreaterThanOrEqual(0);
-      expect(segment.plateIndex).toBeLessThan(PLATES.length);
+      expect(segment.frameIndex).toBeGreaterThanOrEqual(0);
+      expect(segment.frameIndex).toBeLessThan(MOTION_FRAMES.length);
       // The fastest boundary in the model is the Pacific–Tonga pair at about
       // 26 cm/year — the Tonga microplate is the fastest-moving plate on Earth.
       expect(segment.velocityMmPerYear).toBeGreaterThanOrEqual(0);
@@ -99,6 +131,59 @@ describe("plate boundaries", () => {
     for (const type of BOUNDARY_TYPES) {
       expect(BOUNDARY_SEGMENTS.filter((segment) => segment.type === type).length).toBeGreaterThan(20);
     }
+  });
+
+  /**
+   * An independent check on the Euler poles, using data the poles were not derived
+   * from. PB2002 publishes a relative velocity across every boundary step; the same
+   * number can be recomputed from the two plates' absolute poles as |ω₁ × r − ω₂ × r|.
+   * The two agree only if the whole chain — Bird's Pacific-relative poles, the
+   * NNR-NUVEL-1A Pacific rotation, and the vector addition of the two — is right.
+   */
+  it("reproduces PB2002's own relative velocity at each boundary", () => {
+    const errors: number[] = [];
+
+    for (const segment of BOUNDARY_SEGMENTS) {
+      const codes = segment.plates.split(/[\\/-]/);
+      const left = PLATES.find((plate) => plate.code === codes[0]);
+      const right = PLATES.find((plate) => plate.code === codes[1]);
+      if (!(left && right)) {
+        continue;
+      }
+
+      // The published figure is the mean over the steps the segment was merged from,
+      // and a small fast-spinning plate changes speed sharply along its own edge, so
+      // compare against the closest match along the segment rather than one vertex.
+      let best = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < segment.coords.length; i += 2) {
+        const lon = segment.coords[i] as number;
+        const lat = segment.coords[i + 1] as number;
+        const leftVelocity = PlateReconstruction.velocityAt(PLATES.indexOf(left), lon, lat);
+        const rightVelocity = PlateReconstruction.velocityAt(PLATES.indexOf(right), lon, lat);
+        const toEastNorth = (velocity: { speedMmPerYear: number; azimuthDeg: number }): [number, number] => [
+          velocity.speedMmPerYear * Math.sin((velocity.azimuthDeg * Math.PI) / 180),
+          velocity.speedMmPerYear * Math.cos((velocity.azimuthDeg * Math.PI) / 180),
+        ];
+        const [leftEast, leftNorth] = toEastNorth(leftVelocity);
+        const [rightEast, rightNorth] = toEastNorth(rightVelocity);
+        const relative = Math.hypot(leftEast - rightEast, leftNorth - rightNorth);
+        best = Math.min(best, Math.abs(relative - segment.velocityMmPerYear));
+      }
+      errors.push(best);
+    }
+
+    expect(errors.length).toBeGreaterThan(1000);
+    errors.sort((a, b) => a - b);
+    const median = errors[errors.length >> 1] as number;
+    const ninetyFifth = errors[Math.floor(errors.length * 0.95)] as number;
+
+    // Agreement is essentially exact for the great majority. What is left in the tail
+    // is the handful of tiny, fast-spinning microplates — Manus, Niuafo'ou, Easter,
+    // Juan Fernandez — whose velocity varies by tens of mm/yr across a plate only a
+    // few degrees wide, so simplifying the geometry moves the sample point enough to
+    // matter. A sign error anywhere in the pole chain would move the median instead.
+    expect(median).toBeLessThan(0.5);
+    expect(ninetyFifth).toBeLessThan(5);
   });
 });
 

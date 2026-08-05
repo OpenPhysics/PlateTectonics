@@ -26,6 +26,9 @@ import { fetchElevationGrid, sampleElevation } from "./data/dem.js";
 import { numberArray, round, wrap, writeGeneratedModule } from "./data/emit.js";
 import { fetchJson, fetchText } from "./data/fetchCache.js";
 import {
+  cross,
+  dot,
+  greatCircleDistanceKm,
   type LonLat,
   Profile,
   pointInRing,
@@ -58,6 +61,51 @@ const BOUNDARY_TOLERANCE = 0.25;
 
 /** Plates below this area (square degrees) are drawn but never labelled. */
 const MAJOR_PLATE_AREA = 250;
+
+/**
+ * How far {@link BoundaryMotionField} looks for boundary steps, and the distance floor
+ * in its weighting. The reach sets how far from a junction the blend has settled onto
+ * a single boundary's motion; the floor — about a tenth of a degree, the spacing of
+ * the steps themselves — keeps a step lying under the query point from taking all the
+ * weight, which would make the field discontinuous again.
+ */
+const BOUNDARY_BLEND_DEGREES = 4;
+const BOUNDARY_BLEND_FLOOR = 0.01;
+
+/**
+ * Longest edge, in degrees, left in a plate outline. Simplification leaves edges tens
+ * of degrees long — the Pacific plate's eastern edge is one straight run up the
+ * antimeridian — and an edge only deforms at its ends, so a long one is drawn as a
+ * chord across whatever its two ends do. Splitting them up lets an outline follow the
+ * motion field along its length instead of cutting the corner.
+ */
+const PLATE_OUTLINE_STEP_DEGREES = 5;
+
+/**
+ * How much an outline edge may stretch, in km, over the reconstruction's range before
+ * it is split again.
+ *
+ * The motion field is continuous, so halving an edge brings its two ends closer
+ * together in motion as well as in space, and this converges. It is what stops an
+ * outline drawing a straight line across an ocean where one boundary hands over to the
+ * next — worst around the south-west Pacific microplates, which are only degrees wide
+ * and turn several degrees per million years.
+ */
+const MAX_OUTLINE_STRETCH_KM = 200;
+
+/**
+ * Limits on that refinement, so it terminates whatever the field does. The step floor
+ * is well inside the distance floor of the blend, below which the field is smooth, and
+ * the depth is only a backstop — an outline edge tens of degrees long has to be halved
+ * a dozen times to reach it.
+ */
+const MAX_OUTLINE_SUBDIVISIONS = 14;
+const MIN_OUTLINE_STEP_DEGREES = 0.02;
+
+/** How far the reconstruction is ever run, which is what the refinement is judged over. */
+const RECONSTRUCTION_RANGE_MYR = 50;
+
+const DEGREES_TO_RADIANS = Math.PI / 180;
 
 /**
  * Label anchors that read better than the computed centroid: a plate's centroid
@@ -134,12 +182,21 @@ interface PlateBuild {
   name: string;
   major: boolean;
   rings: LonLat[][];
+  /** Motion frame index per ring vertex; filled in once the boundaries are known. */
+  ringFrames: number[][];
   bounds: [number, number, number, number][];
   labelLon: number;
   labelLat: number;
   poleLat: number;
   poleLon: number;
   poleRate: number;
+}
+
+/** An Euler pole plus a rate about it, in degrees and degrees per million years. */
+interface Rotation {
+  lat: number;
+  lon: number;
+  rate: number;
 }
 
 /**
@@ -193,6 +250,7 @@ async function buildPlates(): Promise<PlateBuild[]> {
       name: feature.properties.PlateName,
       major: false,
       rings: [],
+      ringFrames: [],
       bounds: [],
       labelLon: 0,
       labelLat: 0,
@@ -292,6 +350,7 @@ function emitPlates(plates: readonly PlateBuild[]): void {
     const rings = plate.rings
       .map((ring) => numberArray(ring.flatMap(([lon, lat]) => [round(lon, 2), round(lat, 2)])))
       .join(",");
+    const ringFrames = plate.ringFrames.map((frames) => numberArray(frames)).join(",");
     return [
       "  {",
       `    code: ${JSON.stringify(plate.code)},`,
@@ -303,6 +362,7 @@ function emitPlates(plates: readonly PlateBuild[]): void {
       `    poleLon: ${round(plate.poleLon, 3)},`,
       `    poleRateDegPerMyr: ${round(plate.poleRate, 4)},`,
       `    rings: [\n${wrap(rings, "      ")}\n    ],`,
+      `    ringFrames: [\n${wrap(ringFrames, "      ")}\n    ],`,
       "  },",
     ].join("\n");
   });
@@ -311,7 +371,11 @@ function emitPlates(plates: readonly PlateBuild[]): void {
     `${GENERATED_DIR}/plateData.ts`,
     `The ${plates.length} tectonic plates of the PB2002 model: simplified outlines,
 label anchors, and absolute (no-net-rotation) Euler poles obtained by adding the
-NNR-NUVEL-1A Pacific rotation to PB2002's Pacific-relative poles.`,
+NNR-NUVEL-1A Pacific rotation to PB2002's Pacific-relative poles.
+
+\`ringFrames\` gives the motion frame of each outline vertex — the boundary under it
+rather than the plate inside it, so neighbouring plates keep a shared edge when the
+reconstruction runs. See MOTION_FRAMES in PlateReconstruction.ts.`,
     `import type { PlateRecord } from "../dataTypes.js";\n\nexport const PLATES: readonly PlateRecord[] = [\n${entries.join("\n")}\n];\n`,
   );
 }
@@ -365,24 +429,266 @@ const STEP_CLASS_TO_TYPE: Record<string, BoundaryType> = {
   CCB: "convergent",
 };
 
+// ── Motion frames ─────────────────────────────────────────────────────────────
+
+/**
+ * What each feature rides when the reconstruction clock runs.
+ *
+ * A plate's interior rides the plate: one rigid rotation about its Euler pole. A plate
+ * *boundary* cannot, because it belongs to two plates at once — carry it with either
+ * one and it ploughs into the other, which is exactly where the gaps and overlaps in a
+ * naive rigid reconstruction come from. So every boundary gets a rotation of its own:
+ *
+ *  - **Ridge or transform** — the mean of the two plates' rotation vectors. The
+ *    velocity that gives is the average of the two plate velocities at every point,
+ *    which is where a spreading axis sits when accretion is symmetric, and is
+ *    stationary with respect to a fault the two plates merely slide along.
+ *  - **Subduction zone** — the overriding plate. A trench is a feature of the plate
+ *    that stays; the descending plate is the one being consumed at it.
+ *
+ * Both plates' outlines then use the *same* rotation along the boundary they share, so
+ * the mosaic stays a mosaic: what changes through time is each plate's area, growing
+ * along its ridges and shrinking at its trenches. That is the point of the picture.
+ */
+class MotionFrames {
+  /** Rotations that are not simply a plate's, in the order they were first needed. */
+  private readonly derived: Rotation[] = [];
+
+  /** Frame index already assigned to a pair of plates, keyed by the sorted pair. */
+  private readonly byPlatePair = new Map<string, number>();
+
+  /** Frame index already assigned to a rotation, keyed by its rounded numbers. */
+  private readonly byRotation = new Map<string, number>();
+
+  private readonly plates: readonly PlateBuild[];
+
+  public constructor(plates: readonly PlateBuild[]) {
+    this.plates = plates;
+  }
+
+  /** The derived rotations, which the runtime appends to the plates' own. */
+  public get derivedFrames(): readonly Rotation[] {
+    return this.derived;
+  }
+
+  /** The rotation a frame index stands for, whether it is a plate's or derived. */
+  public rotationOf(frameIndex: number): Rotation {
+    return frameIndex < this.plates.length
+      ? plateRotation(this.plates[frameIndex] as PlateBuild)
+      : (this.derived[frameIndex - this.plates.length] as Rotation);
+  }
+
+  /**
+   * Frame index for an arbitrary rotation — what the blended field returns along a
+   * plate outline. Rotations that round to the same numbers share an entry, which
+   * collapses the long stretches of outline where the blend has settled onto one
+   * boundary's motion.
+   */
+  public intern(rotation: Rotation): number {
+    const rounded: Rotation = {
+      lat: round(rotation.lat, 3),
+      lon: round(rotation.lon, 3),
+      rate: round(rotation.rate, 4),
+    };
+    const key = `${rounded.lat}:${rounded.lon}:${rounded.rate}`;
+    const existing = this.byRotation.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const index = this.plates.length + this.derived.length;
+    this.derived.push(rounded);
+    this.byRotation.set(key, index);
+    return index;
+  }
+
+  /**
+   * Frame index for a PB2002 boundary of the given class. Indices below
+   * `plates.length` are plates; the rest index {@link derivedFrames}.
+   */
+  public forBoundary(boundaryName: string, type: BoundaryType): number {
+    const parsed = parseBoundaryName(boundaryName);
+    if (!parsed) {
+      throw new Error(`Unrecognised PB2002 boundary name ${boundaryName}`);
+    }
+    const left = this.plates.findIndex((plate) => plate.code === parsed.left);
+    const right = this.plates.findIndex((plate) => plate.code === parsed.right);
+    if (left === -1 || right === -1) {
+      throw new Error(`Boundary ${boundaryName} names a plate that is not in the model`);
+    }
+
+    // A trench rides whichever plate is not going down it.
+    if (type === "convergent" && parsed.overriding !== null) {
+      return parsed.overriding === "left" ? left : right;
+    }
+
+    const key = left < right ? `${left}:${right}` : `${right}:${left}`;
+    const existing = this.byPlatePair.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const leftPlate = this.plates[left] as PlateBuild;
+    const rightPlate = this.plates[right] as PlateBuild;
+    const index = this.intern(meanRotationVector(plateRotation(leftPlate), plateRotation(rightPlate)));
+    this.byPlatePair.set(key, index);
+    return index;
+  }
+}
+
+/** A plate's absolute rotation, in the shape the vector helpers take. */
+function plateRotation(plate: PlateBuild): Rotation {
+  return { lat: plate.poleLat, lon: plate.poleLon, rate: plate.poleRate };
+}
+
+/**
+ * Averages two rotation vectors. Halving the rate of the sum halves the vector, and
+ * v = ω × r is linear in ω, so the result moves every point at the mean of the two
+ * plates' velocities.
+ */
+function meanRotationVector(a: Rotation, b: Rotation): Rotation {
+  const sum = addRotationVectors(a, b);
+  return { lat: sum.lat, lon: sum.lon, rate: sum.rate / 2 };
+}
+
+/**
+ * Splits a PB2002 boundary name into its two plate codes and its subduction polarity.
+ *
+ * Bird names each boundary section with the two plate codes and a separator that
+ * doubles as a cross-section through it: `-` where neither plate descends, `\` where
+ * the left-hand plate descends beneath the right-hand one, and `/` where the
+ * right-hand plate descends beneath the left. So `"NZ\\SA"` is Nazca going down under
+ * South America, and `"TO/PA"` is the Pacific going down under Tonga — and the
+ * separator names the overriding plate wherever there is one.
+ */
+function parseBoundaryName(name: string): { left: string; right: string; overriding: "left" | "right" | null } | null {
+  const match = /^([A-Z]{2})([-\\/])([A-Z]{2})$/.exec(name);
+  if (!match) {
+    return null;
+  }
+  const [, left, separator, right] = match as unknown as [string, string, string, string];
+  return {
+    left,
+    right,
+    overriding: separator === "\\" ? "right" : separator === "/" ? "left" : null,
+  };
+}
+
+/**
+ * The motion of the boundary network as a *field* over the globe, built from the raw
+ * PB2002 step vertices on a 1° grid.
+ *
+ * Snapping each outline vertex to the single nearest boundary is not enough, because
+ * the answer then jumps where one boundary hands over to the next. Neighbouring
+ * boundaries genuinely move differently — a trench rides the overriding plate while
+ * the transform it grades into rides the mean — so at every junction two consecutive
+ * outline vertices would fly apart, and the edge drawn between them would sweep a line
+ * across an ocean. Around the south-west Pacific microplates that reached 6 000 km.
+ *
+ * Instead each point takes an inverse-distance-weighted blend of the boundary motions
+ * near it. Close to a boundary the nearest steps dominate and the blend is that
+ * boundary's own motion, to a fraction of a percent; approaching a junction it turns
+ * smoothly into the next one's. Because the blend is a function of *position alone*,
+ * two plates that share an edge get the same answer along it however their outlines
+ * were simplified — which is what keeps the mosaic closed.
+ *
+ * Rotation vectors may be averaged like this because velocity is linear in them:
+ * v = ω × r, so a blend of rotations moves a point at the blend of their velocities.
+ */
+class BoundaryMotionField {
+  private readonly cells = new Map<number, { lon: number; lat: number; rotation: Rotation }[]>();
+
+  /** Longitude is wrapped into the key so a lookup at −180° finds steps at +180°. */
+  private static cellKey(lon: number, lat: number): number {
+    const cellLon = (((Math.floor(lon) % 360) + 360) % 360) + 1;
+    return cellLon * 1000 + Math.floor(lat) + 90;
+  }
+
+  public add(lon: number, lat: number, rotation: Rotation): void {
+    const key = BoundaryMotionField.cellKey(lon, lat);
+    const cell = this.cells.get(key);
+    if (cell) {
+      cell.push({ lon, lat, rotation });
+    } else {
+      this.cells.set(key, [{ lon, lat, rotation }]);
+    }
+  }
+
+  /**
+   * The blended rotation at a point.
+   *
+   * `interior` is the motion to fall back on away from every boundary — the plate's
+   * own. It joins the blend as though it were one more sample sitting at exactly the
+   * cutoff distance, rather than being switched to, because switching would put a
+   * discontinuity back into the field: that is what used to tear the Pacific plate
+   * open along the seam it is cut at on the antimeridian, out in open ocean where the
+   * nearest boundary is thousands of kilometres away. Against a boundary the samples
+   * on it outweigh this term by three orders of magnitude, so a shared edge is still
+   * shared however the two plates either side of it are labelled.
+   */
+  public at(lon: number, lat: number, interior: Rotation): Rotation {
+    const interiorWeight = 1 / (BOUNDARY_BLEND_DEGREES * BOUNDARY_BLEND_DEGREES + BOUNDARY_BLEND_FLOOR);
+    const [ix, iy, iz] = toUnitVector(interior.lon, interior.lat);
+    let x = interiorWeight * ix * interior.rate;
+    let y = interiorWeight * iy * interior.rate;
+    let z = interiorWeight * iz * interior.rate;
+    let totalWeight = interiorWeight;
+    // Longitudes converge towards the poles, so a degree of longitude is worth less
+    // there; the floor keeps the search from exploding at the poles themselves.
+    const lonScale = Math.max(0.05, Math.cos(lat * DEGREES_TO_RADIANS));
+    const reach = Math.ceil(BOUNDARY_BLEND_DEGREES);
+
+    for (let dLon = -reach; dLon <= reach; dLon++) {
+      for (let dLat = -reach; dLat <= reach; dLat++) {
+        const cell = this.cells.get(BoundaryMotionField.cellKey(lon + dLon, lat + dLat));
+        if (!cell) {
+          continue;
+        }
+        for (const step of cell) {
+          const eastward = (((step.lon - lon + 540) % 360) - 180) * lonScale;
+          const distance = Math.hypot(eastward, step.lat - lat);
+          if (distance > BOUNDARY_BLEND_DEGREES) {
+            continue;
+          }
+          // Shepard weighting, with a floor on the distance so a step lying exactly
+          // under the point does not take infinite weight, and a taper that reaches
+          // zero at the cutoff so a step passing out of range does not step the
+          // answer — the field has to be continuous or the whole point is lost.
+          const taper = 1 - (distance * distance) / (BOUNDARY_BLEND_DEGREES * BOUNDARY_BLEND_DEGREES);
+          const weight = (taper * taper) / (distance * distance + BOUNDARY_BLEND_FLOOR);
+          const [wx, wy, wz] = toUnitVector(step.rotation.lon, step.rotation.lat);
+          x += weight * wx * step.rotation.rate;
+          y += weight * wy * step.rotation.rate;
+          z += weight * wz * step.rotation.rate;
+          totalWeight += weight;
+        }
+      }
+    }
+
+    const blended: [number, number, number] = [x / totalWeight, y / totalWeight, z / totalWeight];
+    const rate = Math.hypot(...blended);
+    if (rate === 0) {
+      return { lat: 0, lon: 0, rate: 0 };
+    }
+    const [poleLon, poleLat] = toLonLat(blended);
+    return { lat: poleLat, lon: poleLon, rate };
+  }
+}
+
 interface BoundarySegmentBuild {
   type: BoundaryType;
   plates: string;
   velocity: number;
   points: LonLat[];
-  /** Index of the first plate named in `plates`; the segment rides that plate. */
-  plateIndex: number;
+  /** Motion frame the segment rides; see {@link MotionFrames}. */
+  frameIndex: number;
 }
 
-async function buildBoundaries(plates: readonly PlateBuild[]): Promise<BoundarySegmentBuild[]> {
+/**
+ * Builds the boundary polylines, and along the way indexes every step vertex by the
+ * motion frame its boundary rides, so the plate outlines can be pinned to the same
+ * frames afterwards.
+ */
+async function buildBoundaries(frames: MotionFrames, field: BoundaryMotionField): Promise<BoundarySegmentBuild[]> {
   const collection = await fetchJson<GeoJsonCollection<StepProperties>>(STEPS_URL, "PB2002_steps.json");
-
-  /** `"NZ\\SA"` / `"AF-AN"` → index of the first plate named. */
-  const firstPlateIndex = (boundaryName: string): number => {
-    const code = boundaryName.split(/[\\/-]/)[0] as string;
-    const index = plates.findIndex((plate) => plate.code === code);
-    return index === -1 ? 0 : index;
-  };
 
   const steps = [...collection.features].sort((a, b) => {
     const byBoundary = a.properties.PLATEBOUND.localeCompare(b.properties.PLATEBOUND);
@@ -400,6 +706,15 @@ async function buildBoundaries(plates: readonly PlateBuild[]): Promise<BoundaryS
       continue;
     }
     const points = featureRings(step)[0] as LonLat[];
+    const frameIndex = frames.forBoundary(step.properties.PLATEBOUND, type);
+
+    // Sample the step into the motion field at full resolution, before any
+    // simplification: this is the field the plate outlines are carried by.
+    const rotation = frames.rotationOf(frameIndex);
+    for (const [lon, lat] of points) {
+      field.add(lon, lat, rotation);
+    }
+
     const first = points[0] as LonLat;
     const continues =
       current !== null &&
@@ -428,7 +743,7 @@ async function buildBoundaries(plates: readonly PlateBuild[]): Promise<BoundaryS
       velocitySum: step.properties.VELOCITYLE,
       stepCount: 1,
       points: [...points],
-      plateIndex: firstPlateIndex(step.properties.PLATEBOUND),
+      frameIndex,
     };
   }
   if (current) {
@@ -447,16 +762,171 @@ function emitBoundaries(segments: readonly BoundarySegmentBuild[]): void {
     const coords = numberArray(segment.points.flatMap(([lon, lat]) => [round(lon, 2), round(lat, 2)]));
     return (
       `  { type: ${JSON.stringify(segment.type)}, plates: ${JSON.stringify(segment.plates)},` +
-      ` velocityMmPerYear: ${round(segment.velocity, 1)}, plateIndex: ${segment.plateIndex},` +
+      ` velocityMmPerYear: ${round(segment.velocity, 1)}, frameIndex: ${segment.frameIndex},` +
       `\n    coords: ${coords} },`
     );
   });
   writeGeneratedModule(
     `${GENERATED_DIR}/boundaryData.ts`,
     `Plate boundary polylines from the PB2002 step file, merged into runs of a single
-boundary class and tagged with the mean relative velocity across the boundary.`,
+boundary class and tagged with the mean relative velocity across the boundary.
+
+\`frameIndex\` is the motion the segment rides when the reconstruction runs — not
+either neighbouring plate's, in general. See MOTION_FRAMES in PlateReconstruction.ts.`,
     `import type { BoundarySegmentRecord } from "../dataTypes.js";\n\nexport const BOUNDARY_SEGMENTS: readonly BoundarySegmentRecord[] = [\n${entries.join("\n")}\n];\n`,
   );
+}
+
+/** Writes the rotations that belong to the boundary network rather than to a plate. */
+function emitMotionFrames(plates: readonly PlateBuild[], frames: MotionFrames): void {
+  const packed = numberArray(frames.derivedFrames.flatMap((frame) => [frame.lat, frame.lon, frame.rate]));
+  writeGeneratedModule(
+    `${GENERATED_DIR}/motionFrameData.ts`,
+    `The ${frames.derivedFrames.length} rotations that belong to a plate *boundary* rather than to a plate.
+
+A boundary drawn on the map rides the mean of its two plates' rotation vectors, which
+is how a spreading axis moves when accretion is symmetric and is stationary with
+respect to a fault the two plates merely slide along. (A subduction zone is the
+exception, and is not in this table: a trench rides the overriding plate, which is a
+plate index.) A plate *outline* vertex rides a blend of the boundaries near it, so the
+mosaic of plates stays closed as it deforms; most of the entries here are those
+blends, which is why there are so many and why consecutive ones are so alike.
+
+Indices continue from PLATES — entry 0 here is frame number ${plates.length}. See
+MOTION_FRAMES in PlateReconstruction.ts.`,
+    [
+      `import type { RotationVector } from "../dataTypes.js";\n`,
+      "/** Pole latitude, pole longitude and rate in °/Myr, three numbers per rotation. */",
+      `const PACKED = ${wrap(packed, "  ").trimStart()};\n`,
+      "export const DERIVED_MOTION_FRAMES: readonly RotationVector[] = Array.from(",
+      "  { length: PACKED.length / 3 },",
+      "  (_unused, index) => ({",
+      "    poleLat: PACKED[index * 3] as number,",
+      "    poleLon: PACKED[index * 3 + 1] as number,",
+      "    poleRateDegPerMyr: PACKED[index * 3 + 2] as number,",
+      "  }),",
+      ");",
+    ].join("\n"),
+  );
+}
+
+/** Turns a point by a rotation vector for `timeMyr`, with Rodrigues' formula. */
+function rotateBy(point: LonLat, rotation: Rotation, timeMyr: number): LonLat {
+  const angle = rotation.rate * timeMyr * DEGREES_TO_RADIANS;
+  const axis = toUnitVector(rotation.lon, rotation.lat);
+  const v = toUnitVector(point[0], point[1]);
+  const sin = Math.sin(angle);
+  const cos = Math.cos(angle);
+  const axisCrossV = cross(axis, v);
+  const axisDotV = dot(axis, v);
+  return toLonLat([
+    v[0] * cos + axisCrossV[0] * sin + axis[0] * axisDotV * (1 - cos),
+    v[1] * cos + axisCrossV[1] * sin + axis[1] * axisDotV * (1 - cos),
+    v[2] * cos + axisCrossV[2] * sin + axis[2] * axisDotV * (1 - cos),
+  ]);
+}
+
+/** Angular separation of two points in degrees, taking the short way round. */
+function separationDegrees(a: LonLat, b: LonLat): number {
+  const eastward = (((b[0] - a[0] + 540) % 360) - 180) * Math.max(0.05, Math.cos(a[1] * DEGREES_TO_RADIANS));
+  return Math.hypot(eastward, b[1] - a[1]);
+}
+
+/** Midpoint of an edge in lon/lat, which is the line the map draws between its ends. */
+function edgeMidpoint(a: LonLat, b: LonLat): LonLat {
+  return [a[0] + (((b[0] - a[0] + 540) % 360) - 180) / 2, (a[1] + b[1]) / 2];
+}
+
+/**
+ * Worst distance, over the reconstruction's range, between where the two ends of an
+ * edge finish up and how far apart they started: how far the drawn edge is stretched
+ * by its ends riding different motions.
+ */
+function edgeStretchKm(a: LonLat, aMotion: Rotation, b: LonLat, bMotion: Rotation): number {
+  const restLength = greatCircleDistanceKm(a, b);
+  let worst = 0;
+  for (const timeMyr of [-RECONSTRUCTION_RANGE_MYR, RECONSTRUCTION_RANGE_MYR]) {
+    const moved = greatCircleDistanceKm(rotateBy(a, aMotion, timeMyr), rotateBy(b, bMotion, timeMyr));
+    worst = Math.max(worst, Math.abs(moved - restLength));
+  }
+  return worst;
+}
+
+/**
+ * Gives every plate-outline vertex the motion of the boundary network beneath it, so
+ * that two plates sharing an edge carry it identically and the mosaic stays closed.
+ *
+ * The outline is refined as it goes. An edge whose two ends ride motions far enough
+ * apart to stretch it noticeably is split in half and both halves reconsidered, which
+ * converges because the field is continuous: the closer two points are, the closer
+ * their motions. Without it an outline draws a straight line across an ocean wherever
+ * one boundary hands over to the next.
+ *
+ * Away from every boundary the field returns the plate's own motion, which is what
+ * carries the seam a polygon is cut along at the antimeridian; the two halves of such
+ * a seam are the same points, so they stay together.
+ */
+function assignRingFrames(plates: readonly PlateBuild[], field: BoundaryMotionField, frames: MotionFrames): void {
+  let vertices = 0;
+
+  for (const plate of plates) {
+    const ownMotion = plateRotation(plate);
+    const motionAt = (point: LonLat): Rotation => field.at(point[0], point[1], ownMotion);
+
+    const refinedRings: LonLat[][] = [];
+    const refinedFrames: number[][] = [];
+
+    for (const ring of plate.rings) {
+      const points: LonLat[] = [];
+      const motions: Rotation[] = [];
+
+      /** Appends the piece from `from` to `to`, splitting it while it stretches. */
+      const walk = (from: LonLat, fromMotion: Rotation, to: LonLat, toMotion: Rotation, depth: number): void => {
+        const splittable =
+          depth < MAX_OUTLINE_SUBDIVISIONS && separationDegrees(from, to) > 2 * MIN_OUTLINE_STEP_DEGREES;
+        const tooLong = separationDegrees(from, to) > PLATE_OUTLINE_STEP_DEGREES;
+        if (splittable && (tooLong || edgeStretchKm(from, fromMotion, to, toMotion) > MAX_OUTLINE_STRETCH_KM)) {
+          const middle = edgeMidpoint(from, to);
+          const middleMotion = motionAt(middle);
+          walk(from, fromMotion, middle, middleMotion, depth + 1);
+          walk(middle, middleMotion, to, toMotion, depth + 1);
+          return;
+        }
+        points.push(to);
+        motions.push(toMotion);
+      };
+
+      const first = ring[0] as LonLat;
+      const firstMotion = motionAt(first);
+      points.push(first);
+      motions.push(firstMotion);
+
+      let previous = first;
+      let previousMotion = firstMotion;
+      for (let i = 1; i < ring.length; i++) {
+        const next = ring[i] as LonLat;
+        // The ring repeats its first vertex at the end, and that repeat has to keep
+        // the frame it was given the first time or the ring will not close.
+        const nextMotion = i === ring.length - 1 ? firstMotion : motionAt(next);
+        walk(previous, previousMotion, next, nextMotion, 0);
+        previous = next;
+        previousMotion = nextMotion;
+      }
+
+      refinedRings.push(points);
+      refinedFrames.push(
+        motions.map((motion) => {
+          vertices++;
+          return frames.intern(motion);
+        }),
+      );
+    }
+
+    plate.rings = refinedRings;
+    plate.ringFrames = refinedFrames;
+  }
+
+  console.log(`  ${vertices} outline vertices carried by the boundary motion field`);
 }
 
 // ── Earthquakes ───────────────────────────────────────────────────────────────
@@ -889,31 +1359,72 @@ real events projected onto the profile from a corridor either side of it.`,
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+/**
+ * The datasets that can be rebuilt, each writing its own generated module.
+ *
+ * `plate-model` covers the plates, their boundaries and the motion frames together,
+ * because those three index into each other and only mean anything as a set.
+ */
+const STEPS = ["plate-model", "land", "earthquakes", "volcanoes", "relief", "cross-sections"] as const;
+type Step = (typeof STEPS)[number];
+
 async function main(): Promise<void> {
-  console.log("Building plate data…");
+  const requested = process.argv.slice(2);
+  const unknown = requested.filter((name) => !(STEPS as readonly string[]).includes(name));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown step ${unknown.join(", ")}. Known steps: ${STEPS.join(", ")}`);
+  }
+  // No arguments rebuilds everything, which is what `npm run build-data` does. Naming
+  // steps rebuilds only those, so a change to the plate model does not also pull a
+  // newer earthquake catalogue and a fresh DEM into the diff.
+  const wanted = (step: Step): boolean => requested.length === 0 || requested.includes(step);
+
+  // The PB2002 model is the backbone — every other dataset is tagged with indices into
+  // it — so it is always built, and only written when it was asked for.
+  console.log("Building plate model…");
   const plates = await buildPlates();
-  emitPlates(plates);
+  const frames = new MotionFrames(plates);
+  const field = new BoundaryMotionField();
+  const boundaries = await buildBoundaries(frames, field);
+  assignRingFrames(plates, field, frames);
+  console.log(
+    `  ${plates.length} plates, ${boundaries.length} boundary segments, ${frames.derivedFrames.length} derived motion frames`,
+  );
+  if (wanted("plate-model")) {
+    emitPlates(plates);
+    emitBoundaries(boundaries);
+    emitMotionFrames(plates, frames);
+  }
 
-  console.log("Building coastlines…");
-  await buildLand(plates);
+  if (wanted("land")) {
+    console.log("Building coastlines…");
+    await buildLand(plates);
+  }
 
-  console.log("Building plate boundaries…");
-  const boundaries = await buildBoundaries(plates);
-  emitBoundaries(boundaries);
+  if (wanted("earthquakes")) {
+    console.log("Building earthquake catalogue…");
+    const quakes = await buildGlobalEarthquakes(plates);
+    console.log(`  ${quakes.length} events`);
+  }
 
-  console.log("Building earthquake catalogue…");
-  const quakes = await buildGlobalEarthquakes(plates);
-  console.log(`  ${quakes.length} events`);
+  // The cross-sections project real volcanoes onto their profiles, so asking for them
+  // rebuilds the volcano catalogue too.
+  let volcanoes: VolcanoBuild[] | null = null;
+  if (wanted("volcanoes") || wanted("cross-sections")) {
+    console.log("Building volcano catalogue…");
+    volcanoes = await buildVolcanoes(plates);
+    console.log(`  ${volcanoes.length} volcanoes`);
+  }
 
-  console.log("Building volcano catalogue…");
-  const volcanoes = await buildVolcanoes(plates);
-  console.log(`  ${volcanoes.length} volcanoes`);
+  if (wanted("relief")) {
+    console.log("Building relief raster…");
+    await buildRelief();
+  }
 
-  console.log("Building relief raster…");
-  await buildRelief();
-
-  console.log("Building cross-sections…");
-  await buildCrossSections(boundaries, volcanoes);
+  if (wanted("cross-sections")) {
+    console.log("Building cross-sections…");
+    await buildCrossSections(boundaries, volcanoes as VolcanoBuild[]);
+  }
 
   console.log("\nDone.");
 }

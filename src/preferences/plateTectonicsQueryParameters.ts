@@ -11,7 +11,7 @@
  * 2. If it should also be user-editable at runtime, surface it as a preference
  *    in PlateTectonicsPreferencesModel (initialize that Property from this query parameter).
  *
- * Usage: append e.g. `?exampleToggle=true` to the sim URL.
+ * Usage: append e.g. `?showPlateLabels=false` to the sim URL.
  */
 
 import { logGlobal } from "scenerystack/phet-core";
@@ -20,12 +20,12 @@ import PlateTectonicsNamespace from "../PlateTectonicsNamespace.js";
 
 const plateTectonicsQueryParameters = QueryStringMachine.getAll({
   /**
-   * Example public boolean parameter. Replace with real sim-specific parameters,
-   * or remove if the sim has none.
+   * Draw each major plate's name on the map. On by default; turn it off with
+   * `?showPlateLabels=false` for a cleaner map or for print.
    */
-  exampleToggle: {
+  showPlateLabels: {
     type: "boolean",
-    defaultValue: false,
+    defaultValue: true,
     public: true,
   },
 });

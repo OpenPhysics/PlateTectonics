@@ -4,9 +4,6 @@
  * Model for the simulation-specific preferences shown in Preferences →
  * Simulation. Each preference Property takes its initial value from the
  * corresponding query parameter in plateTectonicsQueryParameters.
- *
- * Remove the example preference (and its query parameter / UI control) if the
- * sim has no sim-specific preferences.
  */
 
 import { BooleanProperty } from "scenerystack/axon";
@@ -15,18 +12,18 @@ import PlateTectonicsNamespace from "../PlateTectonicsNamespace.js";
 import plateTectonicsQueryParameters from "./plateTectonicsQueryParameters.js";
 
 export class PlateTectonicsPreferencesModel {
-  /** Example preference; initial value comes from the `exampleToggle` query parameter. */
-  public readonly exampleToggleProperty: BooleanProperty;
+  /** Whether plate names are drawn on the map; initial value from the `showPlateLabels` query parameter. */
+  public readonly showPlateLabelsProperty: BooleanProperty;
 
   public constructor(tandem?: Tandem) {
-    this.exampleToggleProperty = new BooleanProperty(
-      plateTectonicsQueryParameters.exampleToggle,
-      tandem ? { tandem: tandem.createTandem("exampleToggleProperty") } : undefined,
+    this.showPlateLabelsProperty = new BooleanProperty(
+      plateTectonicsQueryParameters.showPlateLabels,
+      tandem ? { tandem: tandem.createTandem("showPlateLabelsProperty") } : undefined,
     );
   }
 
   public reset(): void {
-    this.exampleToggleProperty.reset();
+    this.showPlateLabelsProperty.reset();
   }
 }
 

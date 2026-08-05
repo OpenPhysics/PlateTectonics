@@ -1,43 +1,155 @@
 /**
  * PlateTectonicsModel.ts
  *
- * The top-level model for the simulation screen.
+ * All simulation state, as AXON Properties the view observes.
  *
- * Add your simulation's state here using reactive Property objects from
- * scenerystack/axon. The view observes these properties and updates automatically.
+ * The model holds no geometry of its own: the plates, boundaries, earthquakes and
+ * volcanoes are fixed observational datasets (see `src/common/data/`), and the only
+ * thing that evolves is *where the plates are*. That is captured by a single number
+ * — `timeMillionsOfYearsProperty` — which the view feeds to `PlateReconstruction`
+ * to rotate every plate about its Euler pole.
  *
- * ── Example ──────────────────────────────────────────────────────────────────
- *   import { BooleanProperty, NumberProperty } from "scenerystack/axon";
- *
- *   public readonly isRunningProperty = new BooleanProperty(false);
- *   public readonly timeProperty = new NumberProperty(0);    // seconds
- *
- * ── Step cycle ────────────────────────────────────────────────────────────────
- * The Sim calls step(dt) on every animation frame. Advance your model state
- * in that method (e.g. integrate equations, update positions).
- *
- * ── Reset ─────────────────────────────────────────────────────────────────────
- * reset() is called when the user presses Reset All. Call .reset() on every
- * Property declared here.
+ * ── State groups ──────────────────────────────────────────────────────────────
+ *  - Layer visibility: which overlays are drawn.
+ *  - Earthquake depth filter: which hypocentres are drawn.
+ *  - View selection: the global map, or one of the three boundary cross-sections.
+ *  - Time: the reconstruction clock, plus play/pause and speed.
  */
+
+import type { TReadOnlyProperty } from "scenerystack/axon";
+import { BooleanProperty, DerivedProperty, EnumerationProperty, NumberProperty, Property } from "scenerystack/axon";
+import { Range } from "scenerystack/dot";
 import type { TModel } from "scenerystack/joist";
+import { TimeSpeed } from "scenerystack/scenery-phet";
+import type { ViewKey } from "../../common/data/dataTypes.js";
+import { TimeModel } from "../../common/TimeModel.js";
+import {
+  FAST_SPEED_MULTIPLIER,
+  MYR_PER_SECOND,
+  PRESENT_DAY_TOLERANCE_MYR,
+  SLOW_SPEED_MULTIPLIER,
+  TIME_RANGE_MYR,
+  TIME_STEP_MYR,
+} from "../../PlateTectonicsConstants.js";
+import type { EarthquakeDepthFilter } from "./EarthquakeDepthFilter.js";
+
+/** Range of the reconstruction clock, in millions of years from the present. */
+export const TIME_RANGE = new Range(-TIME_RANGE_MYR, TIME_RANGE_MYR);
 
 export class PlateTectonicsModel implements TModel {
+  // ── Layer visibility ────────────────────────────────────────────────────────
+
+  /** Plate boundaries, colour-coded divergent / convergent / transform. */
+  public readonly showBoundariesProperty = new BooleanProperty(true);
+
+  /** Absolute plate motion vectors, scaled in mm/year. */
+  public readonly showVectorsProperty = new BooleanProperty(true);
+
+  /** Earthquake epicentres, sized by magnitude and coloured by depth. */
+  public readonly showEarthquakesProperty = new BooleanProperty(true);
+
+  /** Holocene volcanoes and intraplate hotspots. */
+  public readonly showVolcanoesProperty = new BooleanProperty(true);
+
+  /** The shaded relief raster: land topography and ocean-floor bathymetry. */
+  public readonly showTopographyProperty = new BooleanProperty(true);
+
+  // ── Filtering ───────────────────────────────────────────────────────────────
+
+  /** Which earthquake depth band to show. */
+  public readonly earthquakeDepthFilterProperty = new Property<EarthquakeDepthFilter>("all");
+
+  // ── View selection ──────────────────────────────────────────────────────────
+
+  /** The global map, or one of the boundary cross-sections. */
+  public readonly selectedViewProperty = new Property<ViewKey>("global");
+
+  /** True while a cross-section is on screen rather than the global map. */
+  public readonly isCrossSectionProperty: TReadOnlyProperty<boolean>;
+
+  // ── Time ────────────────────────────────────────────────────────────────────
+
   /**
-   * Resets all model state to initial values.
-   * Called when the user presses the Reset All button.
+   * Reconstruction time in millions of years relative to the present: negative is
+   * the past, positive the future.
    */
-  public reset(): void {
-    // TODO: call .reset() on every Property declared in this model
+  public readonly timeMillionsOfYearsProperty = new NumberProperty(0, { range: TIME_RANGE });
+
+  /** Play/pause plus the elapsed wall-clock time that drives cross-section animation. */
+  public readonly timer = new TimeModel();
+
+  /** Slow / normal / fast, applied to {@link MYR_PER_SECOND}. */
+  public readonly timeSpeedProperty = new EnumerationProperty(TimeSpeed.NORMAL);
+
+  /** True while the reconstruction is (within rounding) at the present day. */
+  public readonly isPresentDayProperty: TReadOnlyProperty<boolean>;
+
+  public constructor() {
+    this.isCrossSectionProperty = new DerivedProperty(
+      [this.selectedViewProperty],
+      (view: ViewKey) => view !== "global",
+    );
+    this.isPresentDayProperty = new DerivedProperty(
+      [this.timeMillionsOfYearsProperty],
+      (time: number) => Math.abs(time) <= PRESENT_DAY_TOLERANCE_MYR,
+    );
+  }
+
+  /** Millions of years of plate motion per second of wall-clock time, at the current speed. */
+  public get millionYearsPerSecond(): number {
+    if (this.timeSpeedProperty.value === TimeSpeed.SLOW) {
+      return MYR_PER_SECOND * SLOW_SPEED_MULTIPLIER;
+    }
+    if (this.timeSpeedProperty.value === TimeSpeed.FAST) {
+      return MYR_PER_SECOND * FAST_SPEED_MULTIPLIER;
+    }
+    return MYR_PER_SECOND;
   }
 
   /**
-   * Steps the model forward by dt seconds.
-   * Called every animation frame by the Sim framework.
-   *
-   * @param _dt - elapsed time in seconds since the last frame
+   * Advances the reconstruction by one press of the step button, clamped to the
+   * ends of {@link TIME_RANGE}.
    */
-  public step(_dt: number): void {
-    // TODO: advance simulation state here
+  public stepTime(direction: 1 | -1): void {
+    this.timeMillionsOfYearsProperty.value = TIME_RANGE.constrainValue(
+      this.timeMillionsOfYearsProperty.value + direction * TIME_STEP_MYR,
+    );
+  }
+
+  /** Returns the reconstruction to the present day, leaving layer settings alone. */
+  public resetTime(): void {
+    this.timeMillionsOfYearsProperty.reset();
+    this.timer.reset();
+  }
+
+  /**
+   * Steps the model forward by `dt` seconds of wall-clock time. While playing, the
+   * reconstruction clock advances and stops (rather than wrapping) at the end of
+   * its range, because extrapolating today's velocities further would be meaningless.
+   */
+  public step(dt: number): void {
+    this.timer.step(dt);
+    if (!this.timer.isPlayingProperty.value) {
+      return;
+    }
+
+    const advanced = this.timeMillionsOfYearsProperty.value + dt * this.millionYearsPerSecond;
+    this.timeMillionsOfYearsProperty.value = TIME_RANGE.constrainValue(advanced);
+    if (advanced >= TIME_RANGE.max) {
+      this.timer.isPlayingProperty.value = false;
+    }
+  }
+
+  /** Resets all model state to its initial values (the Reset All button). */
+  public reset(): void {
+    this.showBoundariesProperty.reset();
+    this.showVectorsProperty.reset();
+    this.showEarthquakesProperty.reset();
+    this.showVolcanoesProperty.reset();
+    this.showTopographyProperty.reset();
+    this.earthquakeDepthFilterProperty.reset();
+    this.selectedViewProperty.reset();
+    this.timeSpeedProperty.reset();
+    this.resetTime();
   }
 }

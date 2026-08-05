@@ -3,21 +3,111 @@
   "screens": {
     "plateTectonics": "Plate Tectonics"
   },
+  "views": {
+    "title": "View",
+    "global": "Global map",
+    "subduction": "Subduction zone — Chile trench",
+    "divergent": "Spreading ridge — Mid-Atlantic",
+    "transform": "Transform fault — San Andreas"
+  },
+  "layers": {
+    "title": "Layers",
+    "plateBoundaries": "Plate boundaries",
+    "motionVectors": "Motion vectors",
+    "earthquakes": "Earthquakes",
+    "volcanoes": "Volcanoes and hotspots",
+    "topography": "Topography / bathymetry"
+  },
+  "depthFilter": {
+    "title": "Earthquake depth",
+    "all": "All depths",
+    "shallow": "Shallow (< 70 km)",
+    "intermediate": "Intermediate (70–300 km)",
+    "deep": "Deep (> 300 km)"
+  },
+  "time": {
+    "title": "Geological time",
+    "present": "Present day",
+    "past": "{{value}} million years ago",
+    "future": "{{value}} million years from now",
+    "rate": "1 second = 1 million years",
+    "reconstruction": "Plate positions extrapolated from today's motion",
+    "topographyAtPresent": "Relief shown at the present day only"
+  },
+  "legend": {
+    "divergent": "Divergent",
+    "convergent": "Convergent",
+    "transform": "Transform",
+    "shallow": "Shallow quake",
+    "intermediate": "Intermediate quake",
+    "deep": "Deep quake",
+    "volcano": "Volcano",
+    "hotspot": "Hotspot",
+    "motion": "Plate motion"
+  },
+  "section": {
+    "trench": "Trench",
+    "ridge": "Mid-ocean ridge",
+    "fault": "Fault zone",
+    "arc": "Volcanic arc",
+    "oceanicCrust": "Oceanic crust",
+    "continentalCrust": "Continental crust",
+    "lithosphere": "Lithosphere",
+    "asthenosphere": "Asthenosphere",
+    "mantle": "Mantle",
+    "wadatiBenioff": "Wadati–Benioff zone",
+    "seaLevel": "Sea level",
+    "depthAxis": "Depth (km)",
+    "distanceAxis": "Distance along profile (km)",
+    "verticalExaggeration": "Relief exaggerated ×{{value}} vertically",
+    "relativeMotion": "{{value}} mm/yr"
+  },
+  "dataSources": "Plates: Bird (2003) · Earthquakes: USGS · Volcanoes: NOAA/GVP · Relief: NOAA",
   "a11y": {
     "plateTectonics": {
       "screenSummary": {
-        "playArea": "The play area shows the main simulation content.",
-        "controlArea": "The control area has a Reset All button that returns the simulation to its starting state.",
-        "interactionHint": "Explore the simulation by interacting with its controls."
+        "playArea": "The play area shows a map of the Earth's tectonic plates, or a cross-section through one plate boundary. Layers of real data can be drawn on top of it: plate boundaries coloured by type, plate motion arrows, earthquake epicentres, volcanoes and hotspots, and shaded relief of the land surface and sea floor.",
+        "controlArea": "The control area has a view selector, a checkbox for each data layer, an earthquake depth filter, controls that run plate motion forwards and backwards through geological time, and a Reset All button.",
+        "interactionHint": "Switch on a pair of layers and look for where they line up — earthquakes and volcanoes around the Pacific, or ridges and shallow earthquakes down the middle of the Atlantic."
       },
-      "currentDetails": "The simulation is in its initial state.",
+      "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
+      "viewDetails": {
+        "global": "The global map is showing.",
+        "subduction": "A cross-section through the Chile trench is showing, where the Nazca plate subducts beneath South America.",
+        "divergent": "A cross-section through the Mid-Atlantic Ridge is showing, where North America and Africa spread apart.",
+        "transform": "A cross-section through the San Andreas fault is showing, where the Pacific and North American plates slide past each other."
+      },
+      "layersDetails": "Layers shown: {{layers}}.",
+      "noLayers": "No data layers are shown.",
+      "depthDetails": {
+        "all": "Earthquakes of all depths are shown.",
+        "shallow": "Only shallow earthquakes, less than 70 kilometres deep, are shown.",
+        "intermediate": "Only intermediate-depth earthquakes, 70 to 300 kilometres deep, are shown.",
+        "deep": "Only deep earthquakes, more than 300 kilometres deep, are shown."
+      },
+      "timeDetails": {
+        "present": "Plates are in their present-day positions.",
+        "past": "Plates are shown as they were about {{value}} million years ago.",
+        "future": "Plates are shown as they would be about {{value}} million years from now."
+      },
       "controls": {
-        "exampleControl": "Example control"
+        "viewSelector": "View",
+        "viewSelectorHelp": "Choose the global map or a cross-section through one kind of plate boundary.",
+        "plateBoundaries": "Plate boundaries",
+        "motionVectors": "Motion vectors",
+        "earthquakes": "Earthquakes",
+        "volcanoes": "Volcanoes and hotspots",
+        "topography": "Topography and bathymetry",
+        "depthFilter": "Earthquake depth",
+        "depthFilterHelp": "Show earthquakes of every depth, or only one depth band.",
+        "timeSlider": "Geological time",
+        "timeSliderHelp": "Move plates back into the past or forward into the future, in millions of years.",
+        "resetTime": "Return to the present day"
       }
     }
   },
   "preferences": {
     "title": "Simulation",
-    "exampleToggle": "Example Toggle"
+    "showPlateLabels": "Show plate names on the map"
   }
 }

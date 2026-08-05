@@ -34,7 +34,7 @@ onReadyToLaunch(() => {
   const simPreferences = new PlateTectonicsPreferencesModel(Tandem.ROOT.createTandem("preferences"));
 
   const screens = [
-    new PlateTectonicsScreen({
+    new PlateTectonicsScreen(simPreferences, {
       name: stringManager.getScreenNames().plateTectonicsStringProperty,
       tandem: Tandem.ROOT.createTandem("plateTectonicsScreen"),
       backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,

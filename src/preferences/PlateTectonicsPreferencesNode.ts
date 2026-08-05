@@ -27,9 +27,9 @@ export class PlateTectonicsPreferencesNode extends VBox {
       fill: PlateTectonicsColors.controlSurfaceTextColorProperty,
     });
 
-    const exampleToggleCheckbox = new Checkbox(
-      preferencesModel.exampleToggleProperty,
-      new Text(prefStrings.exampleToggleStringProperty, {
+    const showPlateLabelsCheckbox = new Checkbox(
+      preferencesModel.showPlateLabelsProperty,
+      new Text(prefStrings.showPlateLabelsStringProperty, {
         font: new PhetFont(14),
         fill: PlateTectonicsColors.controlSurfaceTextColorProperty,
       }),
@@ -37,14 +37,14 @@ export class PlateTectonicsPreferencesNode extends VBox {
         checkboxColor: PlateTectonicsColors.controlSurfaceTextColorProperty,
         checkboxColorBackground: PlateTectonicsColors.controlSurfaceColorProperty,
         spacing: 8,
-        ...(tandem && { tandem: tandem.createTandem("exampleToggleCheckbox") }),
+        ...(tandem && { tandem: tandem.createTandem("showPlateLabelsCheckbox") }),
       },
     );
 
     super({
       align: "left",
       spacing: 12,
-      children: [header, exampleToggleCheckbox],
+      children: [header, showPlateLabelsCheckbox],
     });
   }
 }

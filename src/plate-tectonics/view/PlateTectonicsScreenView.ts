@@ -1,127 +1,188 @@
 /**
  * PlateTectonicsScreenView.ts
  *
- * The top-level view for the simulation screen.
+ * Lays the screen out and wires the view together:
  *
- * All visual nodes are added here. Follow these conventions:
- *   - Use this.layoutBounds for positioning (never magic pixel values)
- *   - Keep a ResetAllButton that calls model.reset() and this.reset()
- *   - Override step(dt) for frame-by-frame animation
+ *   ┌──────────────────────────────────────────┬───────────────┐
+ *   │ title                                    │ view selector │
+ *   │ ┌──────────────────────────────────────┐ ├───────────────┤
+ *   │ │ global map  ·or·  cross-section      │ │ layers        │
+ *   │ └──────────────────────────────────────┘ │ depth filter  │
+ *   │ legend                                   ├───────────────┤
+ *   │                                          │ geological    │
+ *   │                                          │ time          │
+ *   │                                    reset │               │
+ *   └──────────────────────────────────────────┴───────────────┘
  *
- * ── Adding content ────────────────────────────────────────────────────────────
- * 1. Create Node subclasses in separate files (e.g. PlateTectonicsControlPanel.ts)
- * 2. Instantiate them here and call this.addChild(...)
- * 3. Link them to model properties:
- *      model.isRunningProperty.link( isRunning => { ... } );
- *
- * ── Layout bounds ─────────────────────────────────────────────────────────────
- * SceneryStack uses a virtual 1024×618 coordinate space by default.
- * this.layoutBounds gives you the full rectangle; use it for alignment:
- *   center, minX, maxX, minY, maxY, width, height
+ * The global map and the cross-section share one viewport; the view selector swaps
+ * which of them is visible. The relief raster is fetched here, once, and handed to
+ * the map canvas when it has decoded.
  */
 
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
 import { Node, Rectangle, Text } from "scenerystack/scenery";
-import { ResetAllButton } from "scenerystack/scenery-phet";
+import { PhetFont, ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
+import reliefImageUrl from "../../common/data/generated/relief.png";
+import { MapProjection } from "../../common/MapProjection.js";
 import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/PlateTectonicsButtonOptions.js";
+import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
-import { SCREEN_VIEW_MARGIN } from "../../PlateTectonicsConstants.js";
+import { MAP_VIEW_BOUNDS, PANEL_SPACING, SCREEN_VIEW_MARGIN } from "../../PlateTectonicsConstants.js";
+import type { PlateTectonicsPreferencesModel } from "../../preferences/PlateTectonicsPreferencesModel.js";
 import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
+import { CrossSectionNode } from "./CrossSectionNode.js";
+import { LayerControlPanel } from "./LayerControlPanel.js";
+import { MapCanvasNode } from "./MapCanvasNode.js";
+import { MapLegendNode } from "./MapLegendNode.js";
+import { PlateOverlayNode } from "./PlateOverlayNode.js";
 import { PlateTectonicsScreenSummaryContent } from "./PlateTectonicsScreenSummaryContent.js";
+import { TimeControlPanel } from "./TimeControlPanel.js";
+import { ViewControlPanel } from "./ViewControlPanel.js";
+
+const TITLE_FONT = new PhetFont({ size: 17, weight: "bold" });
+const NOTE_FONT = new PhetFont(11);
 
 export type PlateTectonicsScreenViewOptions = ScreenViewOptions;
 
 export class PlateTectonicsScreenView extends ScreenView {
-  public constructor(model: PlateTectonicsModel, providedOptions?: PlateTectonicsScreenViewOptions) {
-    // ── Accessibility: screen summary ───────────────────────────────────────────
-    // The screen summary is the first thing a screen-reader user encounters. It
-    // is registered here, in the ScreenView's super() options, so every sim wires
-    // it the same way. See PlateTectonicsScreenSummaryContent for the four content regions.
+  private readonly mapCanvas: MapCanvasNode;
+
+  public constructor(
+    model: PlateTectonicsModel,
+    preferences: PlateTectonicsPreferencesModel,
+    providedOptions?: PlateTectonicsScreenViewOptions,
+  ) {
     const options = optionize<PlateTectonicsScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
-      {
-        screenSummaryContent: new PlateTectonicsScreenSummaryContent(model),
-      },
+      { screenSummaryContent: new PlateTectonicsScreenSummaryContent(model) },
       providedOptions,
     );
     super(options);
 
-    // ── Background ────────────────────────────────────────────────────────────
-    // A full-screen rectangle that follows the active color profile.
-    // Replace or remove once you add real content.
-    const backgroundRect = new Rectangle(0, 0, this.layoutBounds.width, this.layoutBounds.height, {
-      fill: PlateTectonicsColors.backgroundColorProperty,
-    });
-    this.addChild(backgroundRect);
+    const strings = StringManager.getInstance();
+    const projection = new MapProjection(MAP_VIEW_BOUNDS);
 
-    // ── Placeholder label ─────────────────────────────────────────────────────
-    // Replace this with your actual simulation content.
-    const placeholderText = new Text("Plate Tectonics", {
-      font: "bold 36px sans-serif",
+    // ── Viewport ──────────────────────────────────────────────────────────────
+    this.mapCanvas = new MapCanvasNode(model, projection);
+    const plateOverlay = new PlateOverlayNode(model, projection);
+    const globalView = new Node({ children: [this.mapCanvas, plateOverlay] });
+    const crossSectionView = new CrossSectionNode(model, MAP_VIEW_BOUNDS);
+
+    const viewportFrame = new Rectangle(MAP_VIEW_BOUNDS, {
+      stroke: PlateTectonicsColors.mapFrameColorProperty,
+      lineWidth: 1.5,
+      cornerRadius: 2,
+    });
+
+    this.addChild(globalView);
+    this.addChild(crossSectionView);
+    this.addChild(viewportFrame);
+
+    model.isCrossSectionProperty.link((isCrossSection: boolean) => {
+      globalView.visible = !isCrossSection;
+      crossSectionView.visible = isCrossSection;
+    });
+    preferences.showPlateLabelsProperty.link((showLabels: boolean) => {
+      plateOverlay.visible = showLabels;
+    });
+
+    // ── Title and reconstruction note ─────────────────────────────────────────
+    const title = new Text(strings.getScreenNames().plateTectonicsStringProperty, {
+      font: TITLE_FONT,
       fill: PlateTectonicsColors.textColorProperty,
-      center: this.layoutBounds.center,
+      left: MAP_VIEW_BOUNDS.minX,
+      bottom: MAP_VIEW_BOUNDS.minY - 8,
     });
-    this.addChild(placeholderText);
+    this.addChild(title);
 
-    // ── Accessibility: per-control names ────────────────────────────────────────
-    // EVERY interactive node must carry an `accessibleName` (and an
-    // `accessibleHelpText` where useful), sourced from the StringManager `a11y`
-    // string group — never a hard-coded English literal. Sun/scenery-phet controls
-    // (NumberControl, Checkbox, ComboBox, AquaRadioButtonGroup, …) accept it as an
-    // option; a draggable plain Node needs `tagName: "div", focusable: true` too.
-    // Example (uncomment and adapt when you add a real control):
-    //
-    //   const a11y = StringManager.getInstance().getPlateTectonicsA11yStrings();
-    //   const exampleButton = new RectangularPushButton({
-    //     ...FLAT_RECTANGULAR_BUTTON_OPTIONS, // flat appearance, not SceneryStack's default 3-D look
-    //     content: someIcon,
-    //     listener: () => model.doSomething(),
-    //     accessibleName: a11y.controls.exampleControlStringProperty,
-    //   });
-    //   this.addChild(exampleButton);
+    // Shown only while the plates are away from their present-day positions, where
+    // the relief raster no longer matches the geometry on screen.
+    const reconstructionNote = new Text(strings.getTimeStrings().reconstructionStringProperty, {
+      font: NOTE_FONT,
+      fill: PlateTectonicsColors.secondaryTextColorProperty,
+      right: MAP_VIEW_BOUNDS.maxX,
+      bottom: MAP_VIEW_BOUNDS.minY - 9,
+    });
+    this.addChild(reconstructionNote);
+    model.isPresentDayProperty.link((isPresentDay: boolean) => {
+      reconstructionNote.visible = !isPresentDay;
+    });
 
-    // ── Reset All button ──────────────────────────────────────────────────────
-    // Always position at bottom-right (PhET convention).
+    // ── Legend ────────────────────────────────────────────────────────────────
+    const legend = new MapLegendNode({
+      left: MAP_VIEW_BOUNDS.minX,
+      top: MAP_VIEW_BOUNDS.maxY + PANEL_SPACING,
+    });
+    this.addChild(legend);
+
+    // ── Control column ────────────────────────────────────────────────────────
+    // The combo-box list has to be added above everything else, so it gets its own
+    // parent Node placed last in the z-order.
+    const comboBoxListParent = new Node();
+
+    const viewPanel = new ViewControlPanel(model, comboBoxListParent, {
+      right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
+      top: MAP_VIEW_BOUNDS.minY,
+    });
+    const layerPanel = new LayerControlPanel(model, {
+      right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
+      top: viewPanel.bottom + PANEL_SPACING,
+    });
+    const timePanel = new TimeControlPanel(model, {
+      right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
+      top: layerPanel.bottom + PANEL_SPACING,
+    });
+    this.addChild(viewPanel);
+    this.addChild(layerPanel);
+    this.addChild(timePanel);
+
+    // ── Reset All ─────────────────────────────────────────────────────────────
+    // Bottom-right of the play area rather than of the whole screen: the control
+    // column runs the full height, and the space under the legend is free.
     const resetAllButton = new ResetAllButton({
       ...FLAT_RESET_ALL_BUTTON_OPTIONS,
       listener: () => {
         model.reset();
         this.reset();
       },
-      right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
+      right: MAP_VIEW_BOUNDS.maxX,
       bottom: this.layoutBounds.maxY - SCREEN_VIEW_MARGIN,
     });
     this.addChild(resetAllButton);
+    this.addChild(comboBoxListParent);
 
-    // ── Accessibility: keyboard / reading traversal order ───────────────────────
-    // Make the parallel DOM (Tab order and screen-reader reading order)
-    // deterministic and independent of child z-order. ScreenView throws if you
-    // set pdomOrder on itself, so add a lightweight wrapper Node that "borrows"
-    // the interactive nodes in the order a user should reach them — Reset All
-    // last. Non-interactive decoration (background, placeholder) is omitted.
+    // ── Relief raster ─────────────────────────────────────────────────────────
+    this.loadReliefImage();
+
+    // ── Accessibility: keyboard / reading traversal order ─────────────────────
     this.addChild(
       new Node({
-        pdomOrder: [
-          // TODO: add the sim's interactive nodes here, in traversal order
-          resetAllButton,
-        ],
+        pdomOrder: [viewPanel.comboBox, ...layerPanel.focusOrder, ...timePanel.focusOrder, resetAllButton],
       }),
     );
   }
 
   /**
-   * Resets view-side state (animations, panel visibility, etc.).
-   * Called by the Reset All button listener.
+   * Loads the shaded relief raster and hands it to the map once it has decoded.
+   * The map draws a flat ocean until then, so a slow load never blocks the sim.
    */
+  private loadReliefImage(): void {
+    const image = new window.Image();
+    image.addEventListener("load", () => this.mapCanvas.setReliefImage(image));
+    image.src = reliefImageUrl;
+  }
+
+  /** Resets view-side state. All state that matters lives in the model. */
   public reset(): void {
-    // TODO: reset any view-side state here
+    // Nothing view-only to reset: layer visibility, the view selection and the
+    // reconstruction clock are all model state.
   }
 
   /**
-   * Steps the view forward by dt seconds for animation.
-   * @param _dt - elapsed time in seconds
+   * Cross-section animation is driven by the model clock, which the Sim steps; the
+   * canvas nodes repaint from their Property links, so nothing is needed here.
    */
   public override step(_dt: number): void {
-    // TODO: implement animation updates here
+    // Intentionally empty — see the class documentation.
   }
 }

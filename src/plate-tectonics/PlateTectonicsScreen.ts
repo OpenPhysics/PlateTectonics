@@ -15,6 +15,7 @@ import { Screen } from "scenerystack/sim";
 import type { Tandem } from "scenerystack/tandem";
 import { createPlateTectonicsIcon } from "../common/PlateTectonicsScreenIcons.js";
 import PlateTectonicsColors from "../PlateTectonicsColors.js";
+import type { PlateTectonicsPreferencesModel } from "../preferences/PlateTectonicsPreferencesModel.js";
 import { PlateTectonicsModel } from "./model/PlateTectonicsModel.js";
 import { PlateTectonicsKeyboardHelpContent } from "./view/PlateTectonicsKeyboardHelpContent.js";
 import { PlateTectonicsScreenView } from "./view/PlateTectonicsScreenView.js";
@@ -23,13 +24,14 @@ import { PlateTectonicsScreenView } from "./view/PlateTectonicsScreenView.js";
 type PlateTectonicsScreenOptions = ScreenOptions & { tandem: Tandem };
 
 export class PlateTectonicsScreen extends Screen<PlateTectonicsModel, PlateTectonicsScreenView> {
-  public constructor(options: PlateTectonicsScreenOptions) {
+  public constructor(preferences: PlateTectonicsPreferencesModel, options: PlateTectonicsScreenOptions) {
     super(
       // Model factory — called once when the screen is first shown
       () => new PlateTectonicsModel(),
-      // View factory — receives the model instance
+      // View factory — receives the model instance, plus the sim-level preferences
+      // it needs (whether plate names are drawn on the map).
       (model) =>
-        new PlateTectonicsScreenView(model, {
+        new PlateTectonicsScreenView(model, preferences, {
           tandem: options.tandem.createTandem("view"),
         }),
       optionize<PlateTectonicsScreenOptions, EmptySelfOptions, ScreenOptions>()(

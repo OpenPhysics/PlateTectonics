@@ -60,6 +60,8 @@ export interface BoundarySegmentRecord {
   readonly plates: string;
   /** Mean relative velocity across the boundary, mm/year. */
   readonly velocityMmPerYear: number;
+  /** Index of the plate the segment rides during a reconstruction (the first plate named). */
+  readonly plateIndex: number;
   /** Flat `[lon, lat, …]` polyline in degrees. */
   readonly coords: readonly number[];
 }
@@ -76,6 +78,8 @@ export interface EarthquakeCatalog {
   readonly depthKm: readonly number[];
   /** Moment (or equivalent) magnitude. */
   readonly magnitude: readonly number[];
+  /** Index (into `PLATES`) of the plate each epicentre rides. */
+  readonly plateIndex: readonly number[];
   /** Human-readable description of the catalogue's extent, shown in the legend. */
   readonly description: string;
 }
@@ -89,6 +93,8 @@ export interface VolcanoRecord {
   readonly elevationM: number;
   /** True when the volcano has erupted in recorded history. */
   readonly historical: boolean;
+  /** Index (into `PLATES`) of the plate the volcano rides. */
+  readonly plateIndex: number;
 }
 
 /** A mantle plume / hotspot, which stays put while plates move over it. */

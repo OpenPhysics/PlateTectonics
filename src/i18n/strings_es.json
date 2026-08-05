@@ -1,23 +1,113 @@
 {
-  "title": "Plate Tectonics",
+  "title": "Tectónica de Placas",
   "screens": {
-    "plateTectonics": "Plate Tectonics"
+    "plateTectonics": "Tectónica de Placas"
   },
+  "views": {
+    "title": "Vista",
+    "global": "Mapa global",
+    "subduction": "Zona de subducción — Fosa de Chile",
+    "divergent": "Dorsal de expansión — Atlántico Medio",
+    "transform": "Falla transformante — San Andrés"
+  },
+  "layers": {
+    "title": "Capas",
+    "plateBoundaries": "Límites de placas",
+    "motionVectors": "Vectores de movimiento",
+    "earthquakes": "Terremotos",
+    "volcanoes": "Volcanes y puntos calientes",
+    "topography": "Topografía / batimetría"
+  },
+  "depthFilter": {
+    "title": "Profundidad de los terremotos",
+    "all": "Todas las profundidades",
+    "shallow": "Superficial (< 70 km)",
+    "intermediate": "Intermedia (70–300 km)",
+    "deep": "Profunda (> 300 km)"
+  },
+  "time": {
+    "title": "Tiempo geológico",
+    "present": "Actualidad",
+    "past": "hace {{value}} millones de años",
+    "future": "dentro de {{value}} millones de años",
+    "rate": "1 segundo = 1 millón de años",
+    "reconstruction": "Posiciones de las placas extrapoladas del movimiento actual",
+    "topographyAtPresent": "El relieve se muestra solo en la actualidad"
+  },
+  "legend": {
+    "divergent": "Divergente",
+    "convergent": "Convergente",
+    "transform": "Transformante",
+    "shallow": "Terremoto superficial",
+    "intermediate": "Terremoto intermedio",
+    "deep": "Terremoto profundo",
+    "volcano": "Volcán",
+    "hotspot": "Punto caliente",
+    "motion": "Movimiento de placas"
+  },
+  "section": {
+    "trench": "Fosa",
+    "ridge": "Dorsal oceánica",
+    "fault": "Zona de falla",
+    "arc": "Arco volcánico",
+    "oceanicCrust": "Corteza oceánica",
+    "continentalCrust": "Corteza continental",
+    "lithosphere": "Litosfera",
+    "asthenosphere": "Astenosfera",
+    "mantle": "Manto",
+    "wadatiBenioff": "Zona de Wadati–Benioff",
+    "seaLevel": "Nivel del mar",
+    "depthAxis": "Profundidad (km)",
+    "distanceAxis": "Distancia a lo largo del perfil (km)",
+    "verticalExaggeration": "Relieve exagerado ×{{value}} verticalmente",
+    "relativeMotion": "{{value}} mm/año"
+  },
+  "dataSources": "Placas: Bird (2003) · Terremotos: USGS · Volcanes: NOAA/GVP · Relieve: NOAA",
   "a11y": {
     "plateTectonics": {
       "screenSummary": {
-        "playArea": "El área de juego muestra el contenido principal de la simulación.",
-        "controlArea": "El área de control tiene un botón Restablecer todo que devuelve la simulación a su estado inicial.",
-        "interactionHint": "Explora la simulación interactuando con sus controles."
+        "playArea": "El área de juego muestra un mapa de las placas tectónicas de la Tierra, o un corte transversal a través de un límite de placas. Encima se pueden dibujar capas de datos reales: límites de placas coloreados por tipo, flechas del movimiento de las placas, epicentros de terremotos, volcanes y puntos calientes, y el relieve sombreado de la superficie terrestre y del fondo marino.",
+        "controlArea": "El área de control tiene un selector de vista, una casilla para cada capa de datos, un filtro de profundidad de terremotos, controles que hacen avanzar y retroceder el movimiento de las placas en el tiempo geológico, y un botón de Restablecer todo.",
+        "interactionHint": "Active un par de capas y busque dónde coinciden: terremotos y volcanes alrededor del Pacífico, o dorsales y terremotos superficiales en medio del Atlántico."
       },
-      "currentDetails": "La simulación está en su estado inicial.",
+      "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
+      "viewDetails": {
+        "global": "Se muestra el mapa global.",
+        "subduction": "Se muestra un corte transversal de la fosa de Chile, donde la placa de Nazca subduce bajo América del Sur.",
+        "divergent": "Se muestra un corte transversal de la dorsal Mesoatlántica, donde América del Norte y África se separan.",
+        "transform": "Se muestra un corte transversal de la falla de San Andrés, donde las placas del Pacífico y Norteamericana se deslizan una junto a la otra."
+      },
+      "layersDetails": "Capas mostradas: {{layers}}.",
+      "noLayers": "No se muestra ninguna capa de datos.",
+      "depthDetails": {
+        "all": "Se muestran terremotos de todas las profundidades.",
+        "shallow": "Solo se muestran terremotos superficiales, de menos de 70 kilómetros de profundidad.",
+        "intermediate": "Solo se muestran terremotos de profundidad intermedia, entre 70 y 300 kilómetros.",
+        "deep": "Solo se muestran terremotos profundos, de más de 300 kilómetros."
+      },
+      "timeDetails": {
+        "present": "Las placas están en sus posiciones actuales.",
+        "past": "Las placas se muestran como estaban hace unos {{value}} millones de años.",
+        "future": "Las placas se muestran como estarían dentro de unos {{value}} millones de años."
+      },
       "controls": {
-        "exampleControl": "Control de ejemplo"
+        "viewSelector": "Vista",
+        "viewSelectorHelp": "Elija el mapa global o un corte transversal de un tipo de límite de placas.",
+        "plateBoundaries": "Límites de placas",
+        "motionVectors": "Vectores de movimiento",
+        "earthquakes": "Terremotos",
+        "volcanoes": "Volcanes y puntos calientes",
+        "topography": "Topografía y batimetría",
+        "depthFilter": "Profundidad de los terremotos",
+        "depthFilterHelp": "Muestre terremotos de todas las profundidades, o solo de una banda de profundidad.",
+        "timeSlider": "Tiempo geológico",
+        "timeSliderHelp": "Mueva las placas hacia el pasado o hacia el futuro, en millones de años.",
+        "resetTime": "Volver a la actualidad"
       }
     }
   },
   "preferences": {
     "title": "Simulación",
-    "exampleToggle": "Ejemplo de alternancia"
+    "showPlateLabels": "Mostrar los nombres de las placas en el mapa"
   }
 }

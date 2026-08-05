@@ -370,10 +370,19 @@ interface BoundarySegmentBuild {
   plates: string;
   velocity: number;
   points: LonLat[];
+  /** Index of the first plate named in `plates`; the segment rides that plate. */
+  plateIndex: number;
 }
 
-async function buildBoundaries(): Promise<BoundarySegmentBuild[]> {
+async function buildBoundaries(plates: readonly PlateBuild[]): Promise<BoundarySegmentBuild[]> {
   const collection = await fetchJson<GeoJsonCollection<StepProperties>>(STEPS_URL, "PB2002_steps.json");
+
+  /** `"NZ\\SA"` / `"AF-AN"` → index of the first plate named. */
+  const firstPlateIndex = (boundaryName: string): number => {
+    const code = boundaryName.split(/[\\/-]/)[0] as string;
+    const index = plates.findIndex((plate) => plate.code === code);
+    return index === -1 ? 0 : index;
+  };
 
   const steps = [...collection.features].sort((a, b) => {
     const byBoundary = a.properties.PLATEBOUND.localeCompare(b.properties.PLATEBOUND);
@@ -419,6 +428,7 @@ async function buildBoundaries(): Promise<BoundarySegmentBuild[]> {
       velocitySum: step.properties.VELOCITYLE,
       stepCount: 1,
       points: [...points],
+      plateIndex: firstPlateIndex(step.properties.PLATEBOUND),
     };
   }
   if (current) {
@@ -437,7 +447,8 @@ function emitBoundaries(segments: readonly BoundarySegmentBuild[]): void {
     const coords = numberArray(segment.points.flatMap(([lon, lat]) => [round(lon, 2), round(lat, 2)]));
     return (
       `  { type: ${JSON.stringify(segment.type)}, plates: ${JSON.stringify(segment.plates)},` +
-      ` velocityMmPerYear: ${round(segment.velocity, 1)},\n    coords: ${coords} },`
+      ` velocityMmPerYear: ${round(segment.velocity, 1)}, plateIndex: ${segment.plateIndex},` +
+      `\n    coords: ${coords} },`
     );
   });
   writeGeneratedModule(
@@ -481,7 +492,7 @@ async function fetchQuakes(parameters: Record<string, string | number>, cacheNam
     });
 }
 
-async function buildGlobalEarthquakes(): Promise<QuakeRecord[]> {
+async function buildGlobalEarthquakes(plates: readonly PlateBuild[]): Promise<QuakeRecord[]> {
   const quakes = await fetchQuakes(
     {
       starttime: GLOBAL_QUAKE_START,
@@ -494,7 +505,9 @@ async function buildGlobalEarthquakes(): Promise<QuakeRecord[]> {
   const description = `USGS/ANSS, magnitude ${GLOBAL_QUAKE_MIN_MAGNITUDE}+ since ${GLOBAL_QUAKE_START.slice(0, 4)}`;
   writeGeneratedModule(
     `${GENERATED_DIR}/earthquakeData.ts`,
-    `Global earthquake hypocentres from the USGS ANSS catalogue, stored column-wise.`,
+    `Global earthquake hypocentres from the USGS ANSS catalogue, stored column-wise.
+\`plateIndex\` is the plate each epicentre sits on, so the markers travel with their
+plate when plate motion is run forwards or backwards in time.`,
     [
       `import type { EarthquakeCatalog } from "../dataTypes.js";\n`,
       "export const EARTHQUAKES: EarthquakeCatalog = {",
@@ -502,6 +515,7 @@ async function buildGlobalEarthquakes(): Promise<QuakeRecord[]> {
       `  lat: ${wrap(numberArray(quakes.map((q) => q.lat)), "    ").trimStart()},`,
       `  depthKm: ${wrap(numberArray(quakes.map((q) => q.depthKm)), "    ").trimStart()},`,
       `  magnitude: ${wrap(numberArray(quakes.map((q) => q.magnitude)), "    ").trimStart()},`,
+      `  plateIndex: ${wrap(numberArray(quakes.map((q) => plateIndexAt(plates, q.lon, q.lat))), "    ").trimStart()},`,
       `  description: ${JSON.stringify(description)},`,
       "};",
     ].join("\n"),
@@ -527,7 +541,7 @@ interface VolcanoBuild {
   historical: boolean;
 }
 
-async function buildVolcanoes(): Promise<VolcanoBuild[]> {
+async function buildVolcanoes(plates: readonly PlateBuild[]): Promise<VolcanoBuild[]> {
   const volcanoes: VolcanoBuild[] = [];
   let page = 1;
   let totalPages = 1;
@@ -555,13 +569,14 @@ async function buildVolcanoes(): Promise<VolcanoBuild[]> {
   const entries = volcanoes.map(
     (volcano) =>
       `  { name: ${JSON.stringify(volcano.name)}, lon: ${volcano.lon}, lat: ${volcano.lat},` +
-      ` elevationM: ${volcano.elevationM}, historical: ${volcano.historical} },`,
+      ` elevationM: ${volcano.elevationM}, historical: ${volcano.historical},` +
+      ` plateIndex: ${plateIndexAt(plates, volcano.lon, volcano.lat)} },`,
   );
   writeGeneratedModule(
     `${GENERATED_DIR}/volcanoData.ts`,
     `Holocene volcanoes from the NOAA NCEI volcano location service (Smithsonian
 Global Volcanism Program holdings). \`historical\` marks volcanoes with eruptions
-in recorded history.`,
+in recorded history; \`plateIndex\` is the plate the volcano rides.`,
     `import type { VolcanoRecord } from "../dataTypes.js";\n\nexport const VOLCANOES: readonly VolcanoRecord[] = [\n${entries.join("\n")}\n];\n`,
   );
   return volcanoes;
@@ -712,7 +727,7 @@ const SECTIONS: readonly SectionConfig[] = [
     start: [-121.62, 35.09],
     end: [-119.24, 36.71],
     corridorHalfWidthKm: 40,
-    maxDepthKm: 30,
+    maxDepthKm: 40,
     minMagnitude: 3.0,
     sampleCount: 320,
   },
@@ -883,15 +898,15 @@ async function main(): Promise<void> {
   await buildLand(plates);
 
   console.log("Building plate boundaries…");
-  const boundaries = await buildBoundaries();
+  const boundaries = await buildBoundaries(plates);
   emitBoundaries(boundaries);
 
   console.log("Building earthquake catalogue…");
-  const quakes = await buildGlobalEarthquakes();
+  const quakes = await buildGlobalEarthquakes(plates);
   console.log(`  ${quakes.length} events`);
 
   console.log("Building volcano catalogue…");
-  const volcanoes = await buildVolcanoes();
+  const volcanoes = await buildVolcanoes(plates);
   console.log(`  ${volcanoes.length} volcanoes`);
 
   console.log("Building relief raster…");

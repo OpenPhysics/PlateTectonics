@@ -89,6 +89,41 @@ export class StringManager {
     return stringProperties.a11y.plateTectonics;
   }
 
+  /** Names of the global map and the three cross-section views. */
+  public getViewStrings() {
+    return stringProperties.views;
+  }
+
+  /** Labels for the data-layer checkboxes. */
+  public getLayerStrings() {
+    return stringProperties.layers;
+  }
+
+  /** Labels for the earthquake depth-filter radio buttons. */
+  public getDepthFilterStrings() {
+    return stringProperties.depthFilter;
+  }
+
+  /** Labels and patterns for the geological-time controls and readout. */
+  public getTimeStrings() {
+    return stringProperties.time;
+  }
+
+  /** Labels for the map legend. */
+  public getLegendStrings() {
+    return stringProperties.legend;
+  }
+
+  /** Labels drawn on the boundary cross-sections. */
+  public getSectionStrings() {
+    return stringProperties.section;
+  }
+
+  /** One-line credit for the datasets the simulation renders. */
+  public getDataSourcesStringProperty(): ReadOnlyProperty<string> {
+    return stringProperties.dataSourcesStringProperty;
+  }
+
   /**
    * Simulation-specific preference labels shown in Preferences → Simulation.
    */

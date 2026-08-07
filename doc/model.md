@@ -330,6 +330,21 @@ Old ocean floor is denser and its lithosphere thicker than young ocean floor bec
 has had longer to cool. That single difference is what lets the screen answer "which
 one subducts?" with age rather than composition.
 
+The mantle on this screen is drawn at three densities, not one, because they are three
+different temperatures of the same rock:
+
+| Material | Density kg/m³ | Why |
+|---|---|---|
+| Asthenosphere | 3300 | The hot, weak mantle the plates ride on |
+| Lithospheric mantle | 3400 | ~1000 K colder; α ≈ 3 × 10⁻⁵ /K puts it ~3% denser |
+| Descending slab | 3450 | Colder still, and thick enough to stay that way as it sinks |
+
+The excess density of the cold lithosphere over the asthenosphere beneath it *is* slab
+pull — it is why a cooled plate can sink at all. Painting all three at one value, which
+is what the screen used to do, erased that from density mode: a plate appeared to be
+crust alone, floating on nothing, and the slab was invisible against the mantle it was
+descending through.
+
 ### What is allowed, and why
 
 | Motion | Plates | Result | Runs for |

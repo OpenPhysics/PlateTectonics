@@ -271,6 +271,27 @@ models, for the benefit of one painter.
 a compressed deep one; only the new one carries a zoom level, and only the old one knows
 about DEM profiles.
 
+### Painting order on Plate Motion
+
+`PlateMotionCanvasNode` paints sky, then sea, then mantle, then the plates. The mantle is
+**clipped to below the ground surface** — the merge of both plates' `crustTop` polylines,
+sorted by x. An unclipped mantle band starts at sea level and paints straight over the
+water, which is what made `showSeawaterProperty` a no-op and left every ocean floor with
+sky above it rather than sea. The clip is also what lets a mountain belt standing above
+the waterline still get mantle painted underneath it.
+
+Two related traps, both handled in that file:
+
+- **A `PlateOutline`'s three polylines must run the same direction along x.** `fillBand`
+  closes a band by walking the top forward and the base back; two that disagree fold the
+  band into a bowtie. `tests/PlateGeometry.test.ts` asserts the invariant for every
+  pairing, motion and time, because the failure is silent in the model and spectacular on
+  screen.
+- **`CrossSectionScale.y` clamps.** A slab that has descended past the bottom of the view
+  does not vanish — every point below the floor lands *on* the floor, so it is drawn as a
+  horizontal smear along the bottom edge with its arrow-heads strung out sideways.
+  `paintSlab` trims the centreline at the first point past `scale.bottomM`.
+
 ## Time as a pure parameter
 
 PhET's Plate Motion tab accumulated geometry frame by frame, mutating arrays of samples

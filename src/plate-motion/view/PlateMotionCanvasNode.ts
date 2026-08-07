@@ -18,7 +18,12 @@ import type { CrossSectionScale } from "../../common/model/CrossSectionScale.js"
 import { paintArrowHead } from "../../common/view/CanvasArrows.js";
 import { materialFill } from "../../common/view/EarthMaterial.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
-import { MANTLE_DENSITY_KG_M3, SURFACE_TEMPERATURE_K } from "../../PlateTectonicsConstants.js";
+import {
+  LITHOSPHERIC_MANTLE_DENSITY_KG_M3,
+  MANTLE_DENSITY_KG_M3,
+  SLAB_DENSITY_KG_M3,
+  SURFACE_TEMPERATURE_K,
+} from "../../PlateTectonicsConstants.js";
 import { boundaryGeometry, type PlateOutline } from "../model/PlateGeometry.js";
 import type { PlateMotionModel } from "../model/PlateMotionModel.js";
 import { simpleMantleTemperatureK } from "../model/PlateThermal.js";
@@ -28,6 +33,19 @@ import { plateProperties } from "../model/PlateType.js";
 const MOTION_ARROW_LENGTH = 46;
 
 export type PlateMotionCanvasNodeOptions = CanvasNodeOptions;
+
+/**
+ * The ground profile across the whole section, left edge to right edge.
+ *
+ * The two plates tile the section between them, but neither the order of their samples
+ * nor which of them covers which side is fixed — a rift walks outwards from the axis, a
+ * collision walks in from the far field. Sorting the combined samples by x is what makes
+ * this independent of that: each plate's surface is a function of x, so the merge of the
+ * two is the ground.
+ */
+function groundSurface(geometry: ReturnType<typeof boundaryGeometry>): Vector2[] {
+  return [...geometry.left.crustTop, ...geometry.right.crustTop].sort((a, b) => a.x - b.x);
+}
 
 export class PlateMotionCanvasNode extends CanvasNode {
   private readonly model: PlateMotionModel;
@@ -89,14 +107,12 @@ export class PlateMotionCanvasNode extends CanvasNode {
       context.fillRect(bounds.minX, scale.seaLevelY, bounds.width, bounds.maxY - scale.seaLevelY);
     }
 
-    // The mantle is painted as a band rather than sampled per column: on this screen it
-    // is a backdrop for the plates, not the subject, and a uniform fill reads as one
-    // continuous medium the plates are moving *through*.
-    this.paintMantle(context, mode);
-
     const left = model.leftPlateTypeProperty.value;
     const right = model.rightPlateTypeProperty.value;
     if (!(left && right)) {
+      // Nothing has been placed yet, so there is no ground for the sea to lie on and the
+      // mantle simply fills the section below sea level.
+      this.paintMantle(context, mode, null);
       return;
     }
 
@@ -104,6 +120,14 @@ export class PlateMotionCanvasNode extends CanvasNode {
     const geometry = motion
       ? boundaryGeometry(motion, left, right, model.timeMillionsOfYearsProperty.value)
       : boundaryGeometry("convergent", left, right, 0);
+
+    // The mantle is painted as a band rather than sampled per column: on this screen it
+    // is a backdrop for the plates, not the subject, and a uniform fill reads as one
+    // continuous medium the plates are moving *through*. It is clipped to below the
+    // ground, though — an unclipped band starts at sea level and paints over the ocean,
+    // which is why the sea used to be invisible everywhere the sea floor lies (that is,
+    // everywhere it exists).
+    this.paintMantle(context, mode, groundSurface(geometry));
 
     // ── The slab, under everything it passes beneath ──────────────────────────
     if (geometry.slab.length > 1) {
@@ -145,11 +169,37 @@ export class PlateMotionCanvasNode extends CanvasNode {
     }
   }
 
-  /** A uniform mantle band from the deepest plate down to the bottom of the viewport. */
-  private paintMantle(context: CanvasRenderingContext2D, mode: Parameters<typeof materialFill>[0]): void {
+  /**
+   * The mantle, from the ground down to the bottom of the viewport.
+   *
+   * `surface` is the ground profile across the whole section; the fill is clipped to
+   * below it so the mantle never intrudes into the air or the sea. Pass null before any
+   * plate has been placed, when there is no ground and the band starts at sea level.
+   */
+  private paintMantle(
+    context: CanvasRenderingContext2D,
+    mode: Parameters<typeof materialFill>[0],
+    surface: readonly Vector2[] | null,
+  ): void {
     const scale = this.sectionScale;
     const bounds = this.canvasBounds;
-    const topY = scale.y(0);
+
+    context.save();
+    let topY = scale.y(0);
+    if (surface && surface.length > 1) {
+      context.beginPath();
+      context.moveTo(bounds.minX, bounds.maxY);
+      for (const point of surface) {
+        context.lineTo(scale.x(point.x), scale.y(point.y));
+      }
+      context.lineTo(bounds.maxX, bounds.maxY);
+      context.closePath();
+      context.clip();
+
+      // Start at the highest point of the ground rather than at sea level, so a mountain
+      // belt standing above the water still gets mantle painted under it.
+      topY = Math.min(...surface.map((point) => scale.y(point.y)));
+    }
 
     // Sampled in horizontal bands so the geotherm shows as a gradient rather than a
     // single flat colour — the whole point of the temperature mode.
@@ -160,6 +210,7 @@ export class PlateMotionCanvasNode extends CanvasNode {
       context.fillStyle = materialFill(mode, MANTLE_DENSITY_KG_M3, temperatureK).toCSS();
       context.fillRect(bounds.minX, y, bounds.width, bandHeight + 0.75);
     }
+    context.restore();
   }
 
   /** One plate: crust over lithospheric mantle, each as a closed band. */
@@ -171,8 +222,11 @@ export class PlateMotionCanvasNode extends CanvasNode {
   ): void {
     const properties = plateProperties(type);
 
-    // The lithospheric mantle first, so the crust sits on top of it.
-    context.fillStyle = materialFill(mode, MANTLE_DENSITY_KG_M3, SURFACE_TEMPERATURE_K + 900).toCSS();
+    // The lithospheric mantle first, so the crust sits on top of it. Drawn at the
+    // lithospheric density rather than the asthenosphere's: they are the same rock at
+    // different temperatures, and painting both at MANTLE_DENSITY_KG_M3 made the rigid
+    // part of every plate vanish into its surroundings in density mode.
+    context.fillStyle = materialFill(mode, LITHOSPHERIC_MANTLE_DENSITY_KG_M3, SURFACE_TEMPERATURE_K + 900).toCSS();
     this.fillBand(context, outline.crustBase, outline.lithosphereBase);
 
     context.fillStyle = materialFill(mode, properties.densityKgM3, SURFACE_TEMPERATURE_K + 450).toCSS();
@@ -182,11 +236,22 @@ export class PlateMotionCanvasNode extends CanvasNode {
   /** The descending slab, as a ribbon of constant thickness about its centreline. */
   private paintSlab(
     context: CanvasRenderingContext2D,
-    centreline: readonly Vector2[],
+    fullCentreline: readonly Vector2[],
     halfThicknessM: number,
     mode: Parameters<typeof materialFill>[0],
   ): void {
     const scale = this.sectionScale;
+
+    // Cut the slab off at the bottom of the section. CrossSectionScale.y clamps, so every
+    // point below the floor lands *on* the floor: an untrimmed slab that has descended
+    // past the view is drawn as a horizontal smear along the bottom edge, with its
+    // arrow-heads strung out sideways along it. Keeping the first point past the floor and
+    // dropping the rest lets the ribbon run off the edge and stop there.
+    const past = fullCentreline.findIndex((point) => point.y < scale.bottomM);
+    const centreline = past < 0 ? fullCentreline : fullCentreline.slice(0, past + 1);
+    if (centreline.length < 2) {
+      return;
+    }
 
     // Offset perpendicular to the local heading, so the ribbon keeps its thickness round
     // the bend instead of pinching where the curve is tightest.
@@ -210,7 +275,7 @@ export class PlateMotionCanvasNode extends CanvasNode {
 
     // A slab is cold — that is why it is dense enough to sink, and why it stays rigid
     // far below the depth where the surrounding mantle does not.
-    context.fillStyle = materialFill(mode, MANTLE_DENSITY_KG_M3 + 100, SURFACE_TEMPERATURE_K + 500).toCSS();
+    context.fillStyle = materialFill(mode, SLAB_DENSITY_KG_M3, SURFACE_TEMPERATURE_K + 500).toCSS();
     this.fillBand(context, upper, lower);
 
     // Arrow-heads down the centreline, showing which way it is going.

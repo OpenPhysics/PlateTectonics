@@ -191,9 +191,22 @@ export class CrustModel implements TModel {
     ];
   }
 
-  /** The block containing a given model x, or null between and beyond them. */
+  /**
+   * The block containing a given model x, or null between and beyond them.
+   *
+   * Half-open on the right so neighbouring blocks do not both claim a shared edge, except
+   * at the outermost edge of the last block, which has no neighbour to hand the point on
+   * to. Without that exception the right-hand edge of the viewport — which is exactly that
+   * outermost edge — reads as being outside every block, so the painter and the probe both
+   * treat the last sliver of the picture as open mantle.
+   */
   public columnAt(xM: number): CrustColumn | null {
-    return this.columns.find((column) => xM >= column.leftM && xM < column.rightM) ?? null;
+    const columns = this.columns;
+    const last = columns[columns.length - 1];
+    if (last && xM >= last.leftM && xM <= last.rightM) {
+      return last;
+    }
+    return columns.find((column) => xM >= column.leftM && xM < column.rightM) ?? null;
   }
 
   /** Which named shell a point is in, for the probe's readout and the labels. */

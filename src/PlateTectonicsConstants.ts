@@ -304,6 +304,30 @@ export const OLD_OCEANIC_PLATE_TOP_M = -4000;
 export const OLD_OCEANIC_PLATE_BASE_M = -10000;
 export const OLD_OCEANIC_PLATE_MANTLE_LITHOSPHERE_M = 55000;
 
+/**
+ * Density of the rigid mantle inside a plate, below its crust, kg/m³.
+ *
+ * Deliberately higher than {@link MANTLE_DENSITY_KG_M3}, which stands for the hotter
+ * asthenosphere the plates ride on. The two are the same rock; the difference is
+ * thermal, and it is the whole reason plate tectonics happens. Lithospheric mantle
+ * averages something like 1000 K colder than the asthenosphere beneath it, and with a
+ * coefficient of thermal expansion around 3 × 10⁻⁵ /K that makes it roughly 3% denser.
+ * That excess is what makes a cooled plate negatively buoyant, and therefore what makes
+ * old ocean floor able to sink. Painting the plate and the asthenosphere at one density
+ * would erase the quantity in density mode.
+ */
+export const LITHOSPHERIC_MANTLE_DENSITY_KG_M3 = 3400;
+
+/**
+ * Density of a descending slab, kg/m³.
+ *
+ * Denser still than the lithospheric mantle it is made of: a slab is thick enough to keep
+ * its cold interior on the way down, so it warms far more slowly than it descends and its
+ * contrast against the surrounding mantle grows with depth rather than fading. That
+ * persistent excess density is slab pull.
+ */
+export const SLAB_DENSITY_KG_M3 = 3450;
+
 /** Speed a plate moves at the boundary, m per million years — i.e. 15 mm/year. */
 export const PLATE_SPEED_M_PER_MYR = 15000;
 
@@ -456,6 +480,8 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   OLD_OCEANIC_PLATE_TOP_M,
   OLD_OCEANIC_PLATE_BASE_M,
   OLD_OCEANIC_PLATE_MANTLE_LITHOSPHERE_M,
+  LITHOSPHERIC_MANTLE_DENSITY_KG_M3,
+  SLAB_DENSITY_KG_M3,
   PLATE_SPEED_M_PER_MYR,
   SUBDUCTION_ARC_RADII_M,
   SUBDUCTION_ARC_ANGLE_FRACTIONS,

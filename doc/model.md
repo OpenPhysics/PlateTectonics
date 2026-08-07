@@ -293,9 +293,11 @@ the temperature colour ramp — under the name `SURFACE_TEMPERATURE_K`.
 Density with depth is the PREM curve, sampled at 35 depths through the mantle and
 continued through the core. PREM is derived from seismic wave speeds, so unlike
 everything else on this screen it is an *observation* of the Earth's interior rather
-than a model of it. Its top four entries describe ocean and crust, not mantle, and are
+than a model of it. Its top three entries describe ocean and crust, not mantle, and are
 deliberately not used: this screen draws its own crust, and reading them for the rock
 beneath a block would make the block appear to float on something lighter than itself.
+The lookup is clamped at the table's fourth entry, the 25 km Moho (3381 kg/m³), so the
+topmost mantle value stands in for everything shallower.
 
 ### What this screen does not claim
 
@@ -372,9 +374,10 @@ by a characteristic distance rather than sitting on top of them.
 In a collision the convergence has nowhere to go but up and down. Crust shortening to a
 fraction *f* of its width thickens by 1/*f*, conserving cross-sectional area — the model
 walks the material rather than the screen, so the conservation is exact rather than
-approximate. About 85 % of the thickening goes down as a root and 15 % up as
-topography, which is the ratio isostasy demands and the reason mountain ranges have
-roots several times deeper than they are high.
+approximate. About five sixths of the thickening goes down as a root and one sixth up
+as topography — the 5:1 root-to-height ratio that Airy isostasy demands for continental
+crust (ρc/ρm = 2750/3300) — and is the reason mountain ranges have roots several times
+deeper than they are high.
 
 ### What this screen does not claim
 

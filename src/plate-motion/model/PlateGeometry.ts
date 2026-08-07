@@ -105,8 +105,12 @@ const COLLISION_TIME_SCALE_MYR = 16;
 /** How far either side of the boundary a collision shortens the crust, m. */
 const COLLISION_REACH_M = 260000;
 
-/** Fraction of a collision's thickening that goes down as a root rather than up. */
-const COLLISION_ROOT_SHARE = 0.85;
+/**
+ * Fraction of a collision's thickening that goes down as a root rather than up. Set by
+ * Airy isostasy for continental crust on the mantle — ρc/ρm = 2750/3300 = 5/6 — which is
+ * why a mountain range has a root about five times deeper than it is high.
+ */
+const COLLISION_ROOT_SHARE = 5 / 6;
 
 /** A flat plate outline spanning [x0, x1] at its rest elevations. */
 function flatOutline(type: PlateType, x0M: number, x1M: number): PlateOutline {
@@ -189,9 +193,11 @@ function subductionGeometry(left: PlateType, right: PlateType, down: "left" | "r
   const hinge = slabHinge(downType, 0);
   const curve = new SlabCurve(downType, hinge);
 
-  // SlabCurve is written descending to the right of the hinge, so it is reflected about
-  // the boundary when the left-hand plate is the one going down.
-  const mirror = (point: Vector2): Vector2 => new Vector2(downSign * point.x, point.y);
+  // SlabCurve is written descending to the right of the hinge. A subducting slab does
+  // not descend under its own plate — it passes the hinge and carries on down beneath
+  // the overriding one — so it is mirrored to the side opposite the subducting plate.
+  const overSign = -downSign;
+  const mirror = (point: Vector2): Vector2 => new Vector2(overSign * point.x, point.y);
   const slab = curve.trace(travelledM).map(mirror);
 
   // A trench where the plate bends down — it is pulled below the surrounding sea floor

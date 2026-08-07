@@ -108,14 +108,15 @@ function interpolateTable(table: readonly (readonly [number, number])[], x: numb
 }
 
 /**
- * Depth of the Moho in the PREM table, km.
+ * Depth of the Moho in the PREM table, km, and the depth the mantle lookup is clamped at.
  *
- * The table's first four entries (1020, 2600, 2900 kg/m³) are ocean and *crust*, not
- * mantle — PREM describes a whole standard column. These screens draw their own crust,
- * of their own thickness and density, so reading those entries for the rock beneath it
- * would substitute a second crust for the mantle: the sub-crustal rock would come out
- * *less* dense than the crust above it, and the blocks would appear to float on
- * something lighter than themselves.
+ * The table's first three entries — 1020, 2600 and 2900 kg/m³ at 0, 3 and 15 km — are
+ * ocean and *crust*, not mantle: PREM describes a whole standard column. These screens
+ * draw their own crust, of their own thickness and density, so reading those entries for
+ * the rock beneath it would substitute a second crust for the mantle: the sub-crustal
+ * rock would come out *less* dense than the crust above it, and the blocks would appear
+ * to float on something lighter than themselves. Clamping at the Moho (the fourth entry,
+ * 25 km, 3381 kg/m³) stands the topmost mantle value in for everything shallower.
  */
 const MANTLE_TABLE_TOP_KM = 25;
 

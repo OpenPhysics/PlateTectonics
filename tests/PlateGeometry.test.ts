@@ -128,15 +128,17 @@ describe("subduction", () => {
     }
   });
 
-  it("descends on the side of the denser plate", () => {
-    // Old ocean floor on the right goes down, so the slab runs to the right.
+  it("descends beneath the overriding plate, on the side opposite the denser one", () => {
+    // Old ocean floor on the right goes down, and a subducting slab passes the hinge and
+    // carries on down *under the overriding plate* — so the slab runs to the left, not
+    // back out under the ocean floor it came from.
     const geometry = boundaryGeometry("convergent", left, right, 30);
     const far = geometry.slab[geometry.slab.length - 1];
-    expect(far?.x).toBeGreaterThan(0);
+    expect(far?.x).toBeLessThan(0);
 
-    // Mirrored when the plates are swapped.
+    // Mirrored when the plates are swapped: the slab then runs to the right.
     const mirrored = boundaryGeometry("convergent", right, left, 30);
-    expect(mirrored.slab[mirrored.slab.length - 1]?.x).toBeLessThan(0);
+    expect(mirrored.slab[mirrored.slab.length - 1]?.x).toBeGreaterThan(0);
   });
 
   it("digs a trench at the boundary", () => {
@@ -155,12 +157,14 @@ describe("subduction", () => {
     expect(boundaryGeometry("convergent", left, right, SUBDUCTION_TIME_LIMIT_MYR).magma.length).toBeGreaterThan(0);
   });
 
-  it("puts the arc inland of the trench, not on top of it", () => {
-    // The offset is set by how far the slab has travelled sideways by the time it is
-    // deep enough to melt — which is why real arcs sit a characteristic way inland.
+  it("puts the arc inland on the overriding plate, not on top of the trench", () => {
+    // The arc is a consequence of the slab reaching melt depth *under the overriding
+    // plate*, so it sits a characteristic way inland from the trench — on the continent,
+    // not out on the subducting sea floor. Here the left plate is the overriding one, so
+    // the arc is at negative x.
     const geometry = boundaryGeometry("convergent", left, right, SUBDUCTION_TIME_LIMIT_MYR);
     for (const point of geometry.magma) {
-      expect(Math.abs(point.x)).toBeGreaterThan(30000);
+      expect(point.x).toBeLessThan(-30000);
     }
   });
 
@@ -169,6 +173,7 @@ describe("subduction", () => {
     expect(geometry.volcanoes.length).toBeGreaterThan(0);
     for (const volcano of geometry.volcanoes) {
       expect(volcano.heightM).toBeGreaterThan(0);
+      expect(volcano.xM).toBeLessThan(0);
     }
   });
 

@@ -48,7 +48,14 @@ import { behaviorFor, type MotionType, subductingSide } from "./BoundaryRules.js
 import { crustThickness, lithosphereBaseM, type PlateType, plateProperties } from "./PlateType.js";
 import { SlabCurve, slabHinge } from "./SlabCurve.js";
 
-/** One plate, as three polylines from its outer edge in towards the boundary. */
+/**
+ * One plate, as three polylines across it.
+ *
+ * The invariant every producer here has to keep is that all three run in the *same*
+ * direction along x. The painter closes a band by walking one polyline forward and the
+ * other back, so two that disagree produce a self-crossing bowtie rather than a plate.
+ * Which direction that is does not matter, and it differs between behaviours.
+ */
 export type PlateOutline = {
   readonly crustTop: readonly Vector2[];
   readonly crustBase: readonly Vector2[];
@@ -213,8 +220,11 @@ function subductionGeometry(left: PlateType, right: PlateType, down: "left" | "r
       const fromHinge = Math.abs(xM) / 120000;
       top.push(new Vector2(xM, crustTopM - trenchDepthM * Math.exp(-fromHinge * fromHinge)));
     }
+    // All three polylines run boundary → outer edge. The painter closes a band by walking
+    // the top forward and the base back, so a polyline that ran the other way would fold
+    // the band into a bowtie rather than reversing it harmlessly.
     return {
-      crustTop: top.reverse(),
+      crustTop: top,
       crustBase: [new Vector2(0, crustBaseM), new Vector2(outerM, crustBaseM)],
       lithosphereBase: [new Vector2(0, lithosphereBaseM(downType)), new Vector2(outerM, lithosphereBaseM(downType))],
     };

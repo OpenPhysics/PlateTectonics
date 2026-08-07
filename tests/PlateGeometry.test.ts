@@ -58,6 +58,32 @@ describe("boundaryGeometry at rest", () => {
     expect(geometry).toEqual(restingGeometry("oldOceanic", "oldOceanic"));
   });
 
+  it("runs every polyline of an outline in the same direction along x", () => {
+    // The painter closes a band by walking one polyline forward and the other back, so
+    // two that disagree in direction produce a self-crossing bowtie instead of a plate.
+    // The subducting plate used to reverse its crustTop and not its base lines, which
+    // drew the down-going plate as an X across the whole half of the section.
+    const direction = (points: readonly { x: number }[]): number =>
+      Math.sign((points[points.length - 1]?.x ?? 0) - (points[0]?.x ?? 0));
+
+    for (const left of PLATE_TYPES) {
+      for (const right of PLATE_TYPES) {
+        for (const motion of ["convergent", "divergent"] as const) {
+          for (const tMyr of [0, 1, 17, 35, 50]) {
+            const geometry = boundaryGeometry(motion, left, right, tMyr);
+            for (const outline of [geometry.left, geometry.right]) {
+              const expected = direction(outline.crustTop);
+              expect(direction(outline.crustBase), `${left}/${right} ${motion} t=${tMyr} crustBase`).toBe(expected);
+              expect(direction(outline.lithosphereBase), `${left}/${right} ${motion} t=${tMyr} lithosphere`).toBe(
+                expected,
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+
   it("never throws for any pairing, motion or time", () => {
     for (const left of PLATE_TYPES) {
       for (const right of PLATE_TYPES) {

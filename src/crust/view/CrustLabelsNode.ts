@@ -28,6 +28,9 @@ const BLOCK_LABEL_FONT = new PhetFont({ size: 12, weight: "bold" });
 const LAYER_LABEL_FONT = new PhetFont(12);
 const SEA_LEVEL_FONT = new PhetFont(10);
 
+/** Gap between a block label and the surface it names, view pixels. */
+const BLOCK_LABEL_MARGIN = 6;
+
 export type CrustLabelsNodeOptions = NodeOptions;
 
 export class CrustLabelsNode extends Node {
@@ -113,15 +116,25 @@ export class CrustLabelsNode extends Node {
           return;
         }
         const centreX = scale.x((column.leftM + column.rightM) / 2);
-        this.addChild(
-          new Text(name, {
-            font: BLOCK_LABEL_FONT,
-            fill: PlateTectonicsColors.textColorProperty,
-            centerX: centreX,
-            bottom: scale.y(column.elevationM) - 6,
-            maxWidth: (bounds.width / model.columns.length) * 0.9,
-          }),
-        );
+        const surfaceY = scale.y(column.elevationM);
+        const label = new Text(name, {
+          font: BLOCK_LABEL_FONT,
+          fill: PlateTectonicsColors.textColorProperty,
+          centerX: centreX,
+          maxWidth: (bounds.width / model.columns.length) * 0.9,
+        });
+
+        // A block standing above the water gets its name in the sky above it. A block
+        // whose surface is under water gets it just *inside* the rock instead: the space
+        // above such a block is only a few pixels of sea, and a label placed there lands
+        // on the sea-level line and its caption — which is exactly where the user's own
+        // block sits at its default thickness.
+        if (surfaceY <= seaLevelY - label.height - BLOCK_LABEL_MARGIN) {
+          label.bottom = surfaceY - BLOCK_LABEL_MARGIN;
+        } else {
+          label.top = surfaceY + BLOCK_LABEL_MARGIN;
+        }
+        this.addChild(label);
       });
     }
 

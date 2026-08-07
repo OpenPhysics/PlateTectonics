@@ -68,11 +68,18 @@ export class PlateMotionScreenView extends ScreenView {
     const strings = StringManager.getInstance();
     const a11y = strings.getPlateMotionA11yStrings().controls;
 
-    // The chooser sits above the section, so the section starts below it.
-    const chooserHeight = 62;
+    // The chooser sits above the section, so the section starts below it. Built first and
+    // measured rather than allowed for by a constant: the panel's height depends on the
+    // font and on the length of the three localized crust names, and a guess that is too
+    // small puts the panel on top of the cross-section.
+    const chooser = new CrustChooserPanel(model, {
+      left: SECTION_VIEW_BOUNDS.minX,
+      top: SECTION_VIEW_BOUNDS.minY,
+    });
+
     const bounds = new Bounds2(
       SECTION_VIEW_BOUNDS.minX,
-      SECTION_VIEW_BOUNDS.minY + chooserHeight,
+      SECTION_VIEW_BOUNDS.minY + chooser.height + PANEL_SPACING,
       SECTION_VIEW_BOUNDS.maxX,
       SECTION_VIEW_BOUNDS.maxY,
     );
@@ -118,10 +125,6 @@ export class PlateMotionScreenView extends ScreenView {
     this.addChild(probe);
 
     // ── Crust chooser, above the section ──────────────────────────────────────
-    const chooser = new CrustChooserPanel(model, {
-      left: SECTION_VIEW_BOUNDS.minX,
-      top: SECTION_VIEW_BOUNDS.minY,
-    });
     this.addChild(chooser);
 
     // ── Legend ────────────────────────────────────────────────────────────────

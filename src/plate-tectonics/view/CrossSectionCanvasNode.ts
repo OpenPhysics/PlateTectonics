@@ -19,6 +19,7 @@
 import { Multilink } from "scenerystack/axon";
 import { CanvasNode, type CanvasNodeOptions } from "scenerystack/scenery";
 import type { CrossSectionData } from "../../common/data/dataTypes.js";
+import { FLOW_MARKER_SPACING, paintArrowHead, paintFlowLine } from "../../common/view/CanvasArrows.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import { QUAKE_BASE_RADIUS, QUAKE_RADIUS_PER_MAGNITUDE, VOLCANO_MARKER_SIZE } from "../../PlateTectonicsConstants.js";
 import { depthBand, passesDepthFilter } from "../model/EarthquakeDepthFilter.js";
@@ -26,7 +27,6 @@ import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
 import { CrossSectionGeometry, SLAB_HALF_THICKNESS_KM, type ViewPoint } from "./CrossSectionGeometry.js";
 
 /** Spacing of the marching arrow-heads that show plate and mantle motion, in pixels. */
-const FLOW_MARKER_SPACING = 34;
 
 /** How fast flow markers travel along their path, pixels per second of wall-clock time. */
 const FLOW_MARKER_SPEED = 9;
@@ -340,15 +340,15 @@ export class CrossSectionCanvasNode extends CanvasNode {
     const plateY = geometry.y(geometry.data.maxDepthKm * 0.09);
 
     if (crossing.type === "convergent") {
-      this.paintFlowLine(context, geometry.bounds.minX + 14, plateY, crossingX - 16, plateY, phase);
+      paintFlowLine(context, geometry.bounds.minX + 14, plateY, crossingX - 16, plateY, phase);
       for (const point of this.sampleSlab(phase)) {
-        this.paintArrowHead(context, point.x, point.y, point.angle);
+        paintArrowHead(context, point.x, point.y, point.angle);
       }
     } else if (crossing.type === "divergent") {
-      this.paintFlowLine(context, crossingX + 16, plateY, geometry.bounds.maxX - 14, plateY, phase);
-      this.paintFlowLine(context, crossingX - 16, plateY, geometry.bounds.minX + 14, plateY, phase);
+      paintFlowLine(context, crossingX + 16, plateY, geometry.bounds.maxX - 14, plateY, phase);
+      paintFlowLine(context, crossingX - 16, plateY, geometry.bounds.minX + 14, plateY, phase);
       // Upwelling beneath the axis, feeding the new crust either side.
-      this.paintFlowLine(
+      paintFlowLine(
         context,
         crossingX,
         geometry.y(geometry.asthenosphereBaseKm),
@@ -394,23 +394,6 @@ export class CrossSectionCanvasNode extends CanvasNode {
     }
   }
 
-  /** Draws arrow-heads marching from (x1,y1) towards (x2,y2), offset by `phase`. */
-  private paintFlowLine(
-    context: CanvasRenderingContext2D,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    phase: number,
-  ): void {
-    const length = Math.hypot(x2 - x1, y2 - y1);
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-    for (let along = phase; along < length; along += FLOW_MARKER_SPACING) {
-      const t = along / length;
-      this.paintArrowHead(context, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, angle);
-    }
-  }
-
   /** Samples marching positions down the slab centreline. */
   private sampleSlab(phase: number): { x: number; y: number; angle: number }[] {
     const trace = this.geometry.slabTrace;
@@ -430,17 +413,6 @@ export class CrossSectionCanvasNode extends CanvasNode {
       travelled += segmentLength;
     }
     return markers;
-  }
-
-  /** One filled triangular arrow-head pointing along `angle`. */
-  private paintArrowHead(context: CanvasRenderingContext2D, x: number, y: number, angle: number): void {
-    const size = 5;
-    context.beginPath();
-    context.moveTo(x + Math.cos(angle) * size, y + Math.sin(angle) * size);
-    context.lineTo(x + Math.cos(angle + 2.4) * size, y + Math.sin(angle + 2.4) * size);
-    context.lineTo(x + Math.cos(angle - 2.4) * size, y + Math.sin(angle - 2.4) * size);
-    context.closePath();
-    context.fill();
   }
 
   // ── Boundary, earthquakes, volcanoes ────────────────────────────────────────

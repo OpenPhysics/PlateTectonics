@@ -4,11 +4,16 @@ Sim-specific context for AI assistants. General SceneryStack guidance: [OpenPhys
 
 ## Project
 
-An interactive map of the Earth's tectonic plates, plus cross-sections through a
-subduction zone, a spreading ridge and a transform fault. **Everything on screen is
-real data** — plate model, earthquakes, volcanoes, elevation — so changes that affect
-what is drawn should be checked against [`doc/model.md`](doc/model.md), which records
-where each number comes from and what the model does not claim.
+Three screens. **Plate Tectonics** is an interactive map of the Earth's tectonic plates
+plus cross-sections through a subduction zone, a spreading ridge and a transform fault;
+everything on it is real data — plate model, earthquakes, volcanoes, elevation.
+**Crust** and **Plate Motion** are ports of the two tabs of PhET's Java simulation
+(`Baseline/PhET/trunk/simulations-java/simulations/plate-tectonics/`), and are
+schematic rather than data-driven.
+
+Changes that affect what is drawn should be checked against
+[`doc/model.md`](doc/model.md), which records where each number comes from and what
+each screen does not claim.
 
 Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTemplate).
 
@@ -42,6 +47,24 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/plate-tectonics/view/CrossSectionCanvasNode.ts` | The painted cross-section |
 | `src/plate-tectonics/view/CrossSectionNode.ts` | Section + localized annotations |
 | `src/plate-tectonics/view/LegendSwatches.ts` | Map symbols, shared by legend and checkboxes |
+| `src/common/model/ColorMode.ts` | Density / temperature / both, shared by the two schematic screens |
+| `src/common/model/Isostasy.ts` | Airy elevation incl. water loading, crustal density, geotherm |
+| `src/common/model/EarthStructure.ts` | PREM density table, layer boundaries and temperatures |
+| `src/common/model/CrossSectionScale.ts` | Two-band model-metres → view-pixels mapping |
+| `src/common/view/EarthMaterial.ts` | The density and temperature colour ramps |
+| `src/common/view/ColorModeControlPanel.ts` | The shared "View" panel |
+| `src/common/view/MaterialLegendNode.ts` | The ramp legend |
+| `src/common/view/EarthProbeNode.ts` | The draggable temperature/density probe |
+| `src/common/view/CanvasArrows.ts` | Arrow-heads and flow lines, shared by every painter |
+| `src/crust/model/CrustModel.ts` | Crust screen state; the three floating blocks |
+| `src/crust/model/IsostaticRelaxation.ts` | Critically damped settling toward the Airy target |
+| `src/crust/view/CrustCanvasNode.ts` | The painted Crust cross-section |
+| `src/plate-motion/model/PlateType.ts` | The three plate kinds and their numbers |
+| `src/plate-motion/model/BoundaryRules.ts` | What is legal, what happens, which side subducts |
+| `src/plate-motion/model/SlabCurve.ts` | Arc-length-parameterised descending slab path |
+| `src/plate-motion/model/PlateGeometry.ts` | **The whole behaviour port**: `(motion, plates, t) → shape` |
+| `src/plate-motion/model/PlateMotionModel.ts` | The three-state machine and the clock |
+| `src/plate-motion/view/PlateMotionCanvasNode.ts` | The painted boundary |
 | `scripts/build-data.ts` | Fetches and reshapes every dataset |
 | `scripts/data/` | Fetch cache, GeoTIFF and netCDF readers, geodesy, contouring, emitters |
 
@@ -79,6 +102,26 @@ gapping. The rules and their justification are in
 [`doc/model.md`](doc/model.md#what-carries-what) — read it before changing what any
 feature rides, and note that a frame index is **not** interchangeable with a plate
 index outside the first `PLATES.length` entries.
+
+### The three screens
+
+`Plate Tectonics` is data-driven and its cross-sections come from real profiles.
+`Crust` and `Plate Motion` are schematic and compute their own geometry.
+
+**On Plate Motion, time is a parameter, not an integrator.** `PlateGeometry` is a pure
+function of elapsed time; nothing accumulates shape. That is what makes Rewind,
+step-while-paused and the clock exact, and what makes every claim the screen makes
+unit-testable without running a clock. Do not add per-frame mutation to it — see
+[`doc/implementation-notes.md`](doc/implementation-notes.md#time-as-a-pure-parameter).
+
+**Isostasy is the Crust screen's whole content**, and it deliberately diverges from
+PhET in one place: the submarine branch accounts for water loading, which PhET omitted.
+The provenance of every constant, including the `AIRY_REFERENCE_OFFSET_M` that PhET left
+as a bare `- 3500`, is in [`doc/model.md`](doc/model.md#the-crust-screen).
+
+**`Node` already has `bounds` and `scale()`**, so nodes holding a viewport or a
+`CrossSectionScale` name those fields `viewBounds` and `sectionScale`. Shadowing either
+breaks layout in ways that are hard to trace.
 
 ### Rendering
 
@@ -195,6 +238,16 @@ A11y strings live under `a11y.plateTectonics` in each locale JSON, exposed via
 | `tests/MapProjection.test.ts` | Projection round trips, 2:1 viewport, motion-arrow bearings |
 | `tests/GlobeProjection.test.ts` | Orthographic projection and its inverse, visibility, bearings, camera |
 | `tests/geophysicalData.test.ts` | Integrity of the generated datasets |
+| `tests/Isostasy.test.ts` | Airy elevation, both branches, and the density expression |
+| `tests/EarthStructure.test.ts` | PREM profile and the layer boundaries built on it |
+| `tests/CrossSectionScale.test.ts` | Two-band mapping, monotonicity, round trips |
+| `tests/EarthMaterial.test.ts` | The two colour ramps and the combined mode |
+| `tests/IsostaticRelaxation.test.ts` | Convergence, no overshoot, frame-rate independence |
+| `tests/CrustModel.test.ts` | Slider → density → elevation chain, probe, reset |
+| `tests/BoundaryRules.test.ts` | All 9 pairings × 2 motions; which side subducts |
+| `tests/SlabCurve.test.ts` | Arc continuity and arc-length parameterisation |
+| `tests/PlateGeometry.test.ts` | Rifting, subduction and collision as claims about the Earth |
+| `tests/PlateMotionModel.test.ts` | The three-state machine and the clock |
 | `tests/memory-leak.test.ts` | WeakRef + `forceGC` dispose regression |
 
 Unit tests live only under root `tests/`, mirroring `src/`.

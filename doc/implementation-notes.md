@@ -239,3 +239,91 @@ cluster around the Pacific, which no amount of reshaping should change.
 
 The section renders itself from there: the surface comes from the DEM, the seismicity
 from USGS, and the slab from the seismicity.
+
+## Three screens and what they share
+
+```
+src/
+  common/
+    model/  ColorMode.ts          density / temperature / both
+            Isostasy.ts           Airy elevation, crustal density, crustal geotherm
+            EarthStructure.ts     PREM density, layer boundaries, layer temperatures
+            CrossSectionScale.ts  two-band model-metres → view-pixels mapping
+    view/   EarthMaterial.ts      density and temperature colour ramps
+            ColorModeControlPanel.ts   the shared "View" panel
+            MaterialLegendNode.ts      the ramp legend
+            EarthProbeNode.ts          the draggable temperature/density probe
+            CanvasArrows.ts            arrow-heads and flow lines
+  crust/          the Crust screen
+  plate-motion/   the Plate Motion screen
+  plate-tectonics/ the global map
+```
+
+The three screens share the material colour ramps, the probe, the colour-mode panel and
+the vertical scale. They deliberately do **not** share a cross-section painter: the
+global screen's `CrossSectionCanvasNode` is built from a `CrossSectionData` record and
+fits its slab to real hypocentres, none of which the other two have. Making it
+screen-agnostic would have meant inventing an interface satisfied by three unrelated
+models, for the benefit of one painter.
+
+`CrossSectionScale` is a clean reimplementation of the two-band idea in
+`CrossSectionGeometry`, not a generalisation of it. Both magnify a shallow band against
+a compressed deep one; only the new one carries a zoom level, and only the old one knows
+about DEM profiles.
+
+## Time as a pure parameter
+
+PhET's Plate Motion tab accumulated geometry frame by frame, mutating arrays of samples
+inside five behaviour classes. `PlateGeometry` computes the whole boundary from elapsed
+time and nothing else:
+
+```
+(motionType, leftType, rightType, tMyr) → BoundaryGeometry
+```
+
+Nothing in `PlateMotionModel` mutates a shape. The consequences are worth stating
+because they are the reason for the choice:
+
+- **Rewind and step-while-paused are free and exact.** Setting the clock to any value
+  gives the picture for that value; there is no accumulated state to unwind.
+- **The evolution is unit-testable without a clock.** Every claim in
+  `tests/PlateGeometry.test.ts` — that a rift opens, that an arc appears inland of a
+  trench, that a collision conserves area — is asserted by evaluating the function at a
+  time, not by stepping a simulation and hoping.
+- **The picture cannot drift with frame rate.** There is no integration to accumulate
+  error.
+
+The one thing given up is PhET's Poisson process for individual magma blobs. The
+deterministic version looks the same and reproduces on reload.
+
+The same reasoning does *not* apply to the Crust screen's isostatic settling, which is
+genuinely a relaxation with state, and is integrated in `IsostaticRelaxation` with a
+sub-stepped semi-implicit scheme so it stays frame-rate independent by construction.
+
+## Substituting for 3-D
+
+PhET's original ran on LWJGL with a 3-D camera. Three things did not survive the move to
+a 2-D canvas, and each was cut rather than faked:
+
+- **Transform boundaries.** The motion is into the page. A cross-section can show the
+  rift valley that develops and nothing else, so the screen offers convergent and
+  divergent only and `doc/model.md` says why.
+- **The ruler.** The section carries its own depth and distance axes; a third
+  measurement affordance and a fourth keyboard-drag target bought no new physics.
+- **Manual drag-the-plates mode.** The automatic mode reaches the same states, and the
+  drag handles were a 3-D affordance that would have needed redesigning rather than
+  porting.
+
+The three separate tools of the original — thermometer, density meter, ruler — became
+one `EarthProbeNode` reporting both quantities at one point. That is not only tidier:
+the screens are about temperature and density *not being independent*, and reading both
+at the same place at the same time is what makes that legible.
+
+## Naming around the Node API
+
+`Node` already has a `bounds` property and a `scale()` method, so nodes that hold a
+viewport or a `CrossSectionScale` name those fields `viewBounds` and `sectionScale`.
+Shadowing either silently breaks layout in ways that are hard to trace.
+
+Biome's `noUnusedPrivateClassMembers` does not see reads through `const { x } = this`
+destructuring, so painters read `this.sectionScale` directly.

@@ -1,10 +1,10 @@
 /**
  * PlateTectonicsScreenIcons.ts
  *
- * The home-screen and navigation-bar icon, drawn on the standard PhET 548 × 373
- * canvas: a subduction zone in cross-section, which is the one picture that carries
- * the whole idea — an oceanic plate diving beneath a continent, a trench where it
- * bends down, and a volcano above where it begins to melt.
+ * The home-screen and navigation-bar icons, drawn on the standard PhET 548 × 373
+ * canvas. One factory per screen, each showing the one picture that carries what that
+ * screen is about: a subduction zone for the global map, three blocks floating at
+ * three different heights for the Crust screen.
  */
 import { Shape } from "scenerystack/kite";
 import { Node, Path, Rectangle } from "scenerystack/scenery";
@@ -83,6 +83,97 @@ export function createPlateTectonicsIcon(): ScreenIcon {
         [296, SURFACE_Y - 26],
       ],
       PlateTectonicsColors.volcanoColorProperty,
+    ),
+  ];
+
+  return iconFrom(new Node({ children }));
+}
+
+/**
+ * The Crust screen: three blocks of crust floating in the mantle at three different
+ * heights, with roots proportional to how high they stand. That proportionality is the
+ * whole content of Airy isostasy — the block that stands highest also reaches deepest —
+ * and it is visible at icon size in a way a single block would not be.
+ */
+export function createCrustIcon(): ScreenIcon {
+  const seaLevelY = 168;
+  const blockWidth = W / 3;
+
+  /** [top elevation px above sea level, thickness px] for each block, left to right. */
+  const blocks: readonly (readonly [number, number])[] = [
+    [-34, 44],
+    [10, 96],
+    [46, 150],
+  ];
+
+  const children: Node[] = [
+    new Rectangle(0, 0, W, H, { fill: PlateTectonicsColors.skyColorProperty }),
+    new Rectangle(0, seaLevelY, W, H - seaLevelY, { fill: PlateTectonicsColors.mantleColorProperty }),
+    new Rectangle(0, seaLevelY - 58, W, 58, { fill: PlateTectonicsColors.seaWaterColorProperty }),
+  ];
+
+  blocks.forEach(([topOffset, thickness], index) => {
+    const left = index * blockWidth;
+    const top = seaLevelY - topOffset;
+    children.push(
+      new Rectangle(left, top, blockWidth, thickness, {
+        fill:
+          index === 1
+            ? PlateTectonicsColors.continentalCrustColorProperty
+            : PlateTectonicsColors.oceanicCrustColorProperty,
+        stroke: PlateTectonicsColors.lithosphereColorProperty,
+        lineWidth: 3,
+      }),
+    );
+  });
+
+  return iconFrom(new Node({ children }));
+}
+
+/**
+ * The Plate Motion screen: two plates drawing apart over a spreading ridge, with new
+ * ocean floor between them. Divergent rather than convergent so it stays distinguishable
+ * from createPlateTectonicsIcon(), which is already a subduction zone.
+ */
+export function createPlateMotionIcon(): ScreenIcon {
+  const seaLevelY = 150;
+  const crustDepth = 52;
+  const gapHalfWidth = 74;
+
+  const children: Node[] = [
+    new Rectangle(0, 0, W, H, { fill: PlateTectonicsColors.skyColorProperty }),
+    new Rectangle(0, seaLevelY, W, H - seaLevelY, { fill: PlateTectonicsColors.mantleColorProperty }),
+    new Rectangle(0, seaLevelY - 46, W, 46, { fill: PlateTectonicsColors.seaWaterColorProperty }),
+
+    // Magma rising to the axis from below, the reason the ridge is there at all.
+    polygon(
+      [
+        [W / 2 - 26, seaLevelY],
+        [W / 2 + 26, seaLevelY],
+        [W / 2 + 84, H],
+        [W / 2 - 84, H],
+      ],
+      PlateTectonicsColors.magmaColorProperty,
+    ),
+
+    // The two plates, pulled back from the axis.
+    new Rectangle(0, seaLevelY, W / 2 - gapHalfWidth, crustDepth, {
+      fill: PlateTectonicsColors.oceanicCrustColorProperty,
+    }),
+    new Rectangle(W / 2 + gapHalfWidth, seaLevelY, W / 2 - gapHalfWidth, crustDepth, {
+      fill: PlateTectonicsColors.oceanicCrustColorProperty,
+    }),
+
+    // New floor filling the gap, standing higher at the axis because it is still hot.
+    polygon(
+      [
+        [W / 2 - gapHalfWidth, seaLevelY],
+        [W / 2, seaLevelY - 26],
+        [W / 2 + gapHalfWidth, seaLevelY],
+        [W / 2 + gapHalfWidth, seaLevelY + crustDepth],
+        [W / 2 - gapHalfWidth, seaLevelY + crustDepth],
+      ],
+      PlateTectonicsColors.newCrustColorProperty,
     ),
   ];
 

@@ -10,6 +10,8 @@
 import { describe, expect, it } from "vitest";
 import { PlateReconstruction } from "../src/common/PlateReconstruction.js";
 import { TimeModel } from "../src/common/TimeModel.js";
+import { CrustModel } from "../src/crust/model/CrustModel.js";
+import { PlateMotionModel } from "../src/plate-motion/model/PlateMotionModel.js";
 
 /**
  * Force garbage collection with multiple passes. When `earlyExitRef` is supplied
@@ -47,6 +49,32 @@ function createAndDropReconstruction(): WeakRef<object> {
   return new WeakRef<object>(reconstruction);
 }
 
+/**
+ * A screen model is created afresh every time its screen is first shown, and holds
+ * DerivedProperties that link to its own Properties. Those links are exactly the kind
+ * of cycle that keeps a discarded model alive, so each screen model gets an entry here.
+ */
+function createAndDisposeCrustModel(): WeakRef<object> {
+  const model = new CrustModel();
+  const ref = new WeakRef<object>(model);
+  model.step(1 / 60);
+  model.reset();
+  model.dispose();
+  return ref;
+}
+
+function createAndDisposePlateMotionModel(): WeakRef<object> {
+  const model = new PlateMotionModel();
+  const ref = new WeakRef<object>(model);
+  model.setPlate("left", "continental");
+  model.setPlate("right", "oldOceanic");
+  model.motionTypeProperty.value = "convergent";
+  model.step(1 / 60);
+  model.reset();
+  model.dispose();
+  return ref;
+}
+
 describe("Memory leak regression", () => {
   it("global.gc is available (--expose-gc)", () => {
     expect(globalThis.gc).toBeDefined();
@@ -80,6 +108,36 @@ describe("Memory leak regression", () => {
     const refs: WeakRef<object>[] = [];
     for (let i = 0; i < 10; i++) {
       refs.push(createAndDropReconstruction());
+    }
+    await forceGC();
+    expect(refs.filter((ref) => ref.deref() !== undefined).length).toBe(0);
+  });
+
+  it("CrustModel is collected once disposed", async () => {
+    const ref = createAndDisposeCrustModel();
+    await forceGC(ref);
+    expect(ref.deref()).toBeUndefined();
+  });
+
+  it("repeated CrustModel cycles leave no survivors", async () => {
+    const refs: WeakRef<object>[] = [];
+    for (let i = 0; i < 10; i++) {
+      refs.push(createAndDisposeCrustModel());
+    }
+    await forceGC();
+    expect(refs.filter((ref) => ref.deref() !== undefined).length).toBe(0);
+  });
+
+  it("PlateMotionModel is collected once disposed", async () => {
+    const ref = createAndDisposePlateMotionModel();
+    await forceGC(ref);
+    expect(ref.deref()).toBeUndefined();
+  });
+
+  it("repeated PlateMotionModel cycles leave no survivors", async () => {
+    const refs: WeakRef<object>[] = [];
+    for (let i = 0; i < 10; i++) {
+      refs.push(createAndDisposePlateMotionModel());
     }
     await forceGC();
     expect(refs.filter((ref) => ref.deref() !== undefined).length).toBe(0);

@@ -1,7 +1,68 @@
 {
   "title": "Plate Tectonics",
   "screens": {
-    "plateTectonics": "Plate Tectonics"
+    "plateTectonics": "Plate Tectonics",
+    "crust": "Crust",
+    "plateMotion": "Plate Motion"
+  },
+  "crust": {
+    "myCrust": "My Crust",
+    "temperature": "Temperature",
+    "cool": "Cool",
+    "warm": "Warm",
+    "composition": "Composition",
+    "moreIron": "More iron",
+    "moreSilica": "More silica",
+    "thickness": "Thickness",
+    "thin": "Thin",
+    "thick": "Thick",
+    "thicknessPattern": "{{value}} km",
+    "elevationPattern": "Elevation {{value}} km",
+    "densityPattern": "Density {{value}} kg/m³",
+    "aboveSeaLevel": "above sea level",
+    "belowSeaLevel": "below sea level",
+    "zoom": "Zoom",
+    "zoomCrust": "Crust",
+    "zoomLithosphere": "Lithosphere",
+    "zoomEarth": "Whole Earth"
+  },
+  "material": {
+    "title": "View",
+    "density": "Density",
+    "temperature": "Temperature",
+    "both": "Both",
+    "showLabels": "Show labels",
+    "showSeawater": "Show seawater",
+    "lessDense": "Less dense",
+    "moreDense": "More dense",
+    "cooler": "Cooler",
+    "hotter": "Hotter",
+    "probe": "Probe",
+    "probeTemperature": "{{value}} °C",
+    "probeDensity": "{{value}} kg/m³"
+  },
+  "plateMotion": {
+    "chooseCrust": "Choose Crust",
+    "continental": "Continental",
+    "youngOceanic": "Young oceanic",
+    "oldOceanic": "Old oceanic",
+    "dropLeft": "Drop a plate here",
+    "dropRight": "Drop a plate here",
+    "boundaryType": "Boundary Type",
+    "convergent": "Convergent",
+    "divergent": "Divergent",
+    "rewind": "Rewind",
+    "newCrust": "New Crust",
+    "time": "Time",
+    "speed": "Speed",
+    "slow": "Slow",
+    "fast": "Fast",
+    "elapsedPattern": "{{value}} million years",
+    "newCrustLabel": "New ocean floor",
+    "trench": "Trench",
+    "ridge": "Spreading ridge",
+    "arc": "Volcanic arc",
+    "mountains": "Mountain belt"
   },
   "views": {
     "title": "View",
@@ -66,7 +127,12 @@
     "depthAxis": "Depth (km)",
     "distanceAxis": "Distance along profile (km)",
     "verticalExaggeration": "Relief exaggerated ×{{value}} vertically",
-    "relativeMotion": "{{value}} mm/yr"
+    "relativeMotion": "{{value}} mm/yr",
+    "crust": "Crust",
+    "upperMantle": "Upper mantle",
+    "lowerMantle": "Lower mantle",
+    "outerCore": "Outer core",
+    "innerCore": "Inner core"
   },
   "dataSources": "Plates: Bird (2003) · Earthquakes: USGS · Volcanoes: NOAA/GVP · Relief: NOAA · Seafloor age: EarthByte",
   "a11y": {
@@ -121,6 +187,79 @@
         "timeSlider": "Geological time",
         "timeSliderHelp": "Move plates back into the past or forward into the future, in millions of years.",
         "resetTime": "Return to the present day"
+      }
+    },
+    "crust": {
+      "screenSummary": {
+        "playArea": "The play area shows a cross-section through three blocks of crust floating in the mantle: fixed oceanic crust on the left, fixed continental crust on the right, and in the middle a block whose temperature, composition and thickness you control. Each block settles to the height at which it floats.",
+        "controlArea": "The control area has three sliders for the middle block, a choice of whether to colour the rock by density, by temperature or by both, a zoom control, and a Reset All button.",
+        "interactionHint": "Make the middle block thicker and watch it rise, then make it denser and watch it sink — and notice that it sinks deeper into the mantle at the same time as its surface drops."
+      },
+      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}}",
+      "crustDetails": "The middle block is {{thickness}} km thick with a density of {{density}} kilograms per cubic metre.",
+      "elevationAbove": "Its surface stands {{value}} km above sea level.",
+      "elevationBelow": "Its surface lies {{value}} km below sea level.",
+      "colorModeDetails": "Rock is coloured by {{mode}}.",
+      "zoomDetails": "The view reaches down to the {{extent}}.",
+      "controls": {
+        "temperatureSlider": "Temperature",
+        "temperatureSliderHelp": "Warm the middle block. Hot rock expands, so it becomes slightly less dense and floats a little higher.",
+        "compositionSlider": "Composition",
+        "compositionSliderHelp": "Move the middle block between iron-rich rock and silica-rich rock. Iron-rich rock is denser and floats lower.",
+        "thicknessSlider": "Thickness",
+        "thicknessSliderHelp": "Set how thick the middle block is, from 4 to 70 kilometres. A thicker block floats higher and reaches deeper.",
+        "colorMode": "Colour rock by",
+        "colorModeHelp": "Colour the cross-section by density, by temperature, or by both at once.",
+        "showLabels": "Show labels",
+        "zoom": "Zoom",
+        "zoomHelp": "Pull back from the crust to the lithosphere, or to the whole Earth including the mantle and core.",
+        "probe": "Probe",
+        "probeHelp": "Move the probe through the cross-section to read the temperature and density where it sits."
+      },
+      "modeDensity": "density",
+      "modeTemperature": "temperature",
+      "modeBoth": "density and temperature together",
+      "extentCrust": "base of the crust",
+      "extentLithosphere": "base of the lithosphere",
+      "extentEarth": "centre of the Earth"
+    },
+    "plateMotion": {
+      "screenSummary": {
+        "playArea": "The play area shows a cross-section through the boundary between two tectonic plates. Until plates are chosen it is empty, with a drop zone on each side. Once both sides have a plate and a boundary type has been chosen, the clock runs and the boundary evolves — a slab descending, an ocean opening, or mountains rising.",
+        "controlArea": "The control area has three crust pieces to drag into the drop zones, a boundary type chooser, play, pause and step controls with a speed slider, Rewind and New Crust buttons, a choice of what colours the rock, and a Reset All button.",
+        "interactionHint": "Put old oceanic crust against a continent and converge them, and watch where the volcanoes appear relative to the trench."
+      },
+      "currentDetails": "{{plates}} {{motion}} {{time}}",
+      "platesNone": "Both drop zones are empty.",
+      "platesOne": "One drop zone has a plate; the other is empty.",
+      "platesBoth": "{{left}} crust on the left, {{right}} crust on the right.",
+      "motionNone": "No boundary type has been chosen yet.",
+      "motionSubduction": "They are converging, and the {{side}} plate is subducting beneath the other.",
+      "motionCollision": "They are converging, and neither can subduct, so the crust is thickening into mountains.",
+      "motionRifting": "They are diverging, and new ocean floor is forming between them.",
+      "sideLeft": "left",
+      "sideRight": "right",
+      "timeIdle": "The clock has not started.",
+      "timeRunning": "{{value}} million years have passed.",
+      "timeFinished": "The boundary has run its full {{value}} million years.",
+      "controls": {
+        "crustPiece": "{{name}} crust",
+        "crustPieceHelp": "Drag this into one of the two drop zones, or press Enter to place it in the first empty one.",
+        "leftDropZone": "Left drop zone",
+        "rightDropZone": "Right drop zone",
+        "boundaryType": "Boundary type",
+        "boundaryTypeHelp": "Choose whether the two plates converge or diverge. Only the boundaries these two plates can actually make are available.",
+        "rewind": "Rewind",
+        "rewindHelp": "Run the same two plates from the beginning again.",
+        "newCrust": "New Crust",
+        "newCrustHelp": "Clear both plates and start over.",
+        "speed": "Speed",
+        "speedHelp": "How many million years pass per second.",
+        "colorMode": "Colour rock by",
+        "colorModeHelp": "Colour the cross-section by density, by temperature, or by both at once.",
+        "showLabels": "Show labels",
+        "probe": "Probe",
+        "probeHelp": "Move the probe through the cross-section to read the temperature and density where it sits."
       }
     }
   },

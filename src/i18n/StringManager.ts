@@ -78,15 +78,47 @@ export class StringManager {
    */
   public getScreenNames(): {
     readonly plateTectonicsStringProperty: ReadOnlyProperty<string>;
+    readonly crustStringProperty: ReadOnlyProperty<string>;
+    readonly plateMotionStringProperty: ReadOnlyProperty<string>;
   } {
     return {
       plateTectonicsStringProperty: stringProperties.screens.plateTectonicsStringProperty,
+      crustStringProperty: stringProperties.screens.crustStringProperty,
+      plateMotionStringProperty: stringProperties.screens.plateMotionStringProperty,
     };
   }
 
   /** Accessibility strings for the Plate Tectonics screen. */
   public getPlateTectonicsA11yStrings() {
     return stringProperties.a11y.plateTectonics;
+  }
+
+  /** Labels for the Crust screen's sliders, readouts and zoom control. */
+  public getCrustStrings() {
+    return stringProperties.crust;
+  }
+
+  /** Accessibility strings for the Crust screen. */
+  public getCrustA11yStrings() {
+    return stringProperties.a11y.crust;
+  }
+
+  /**
+   * Labels for the color-mode control, the material legend and the probe — shared by
+   * every screen that paints rock by density or temperature.
+   */
+  public getMaterialStrings() {
+    return stringProperties.material;
+  }
+
+  /** Labels for the Plate Motion screen's crust chooser, boundary types and clock. */
+  public getPlateMotionStrings() {
+    return stringProperties.plateMotion;
+  }
+
+  /** Accessibility strings for the Plate Motion screen. */
+  public getPlateMotionA11yStrings() {
+    return stringProperties.a11y.plateMotion;
   }
 
   /** Names of the global map and the three cross-section views. */

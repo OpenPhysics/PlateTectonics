@@ -35,6 +35,25 @@ fitted to the hypocentres: the drawn slab *is* the Wadati–Benioff zone.
 years into the future at one million years per second. Continents drift, coastlines
 tear along plate boundaries, and hotspots stay put while plates slide over them.
 
+**Crust** — three blocks of crust floating in the mantle: fixed oceanic on the left,
+fixed continental on the right, and in the middle one whose temperature, composition
+and thickness you set. Each settles to the height Airy isostasy puts it at, so a
+thicker block stands higher *and* reaches deeper, and a denser one sinks. Zoom out from
+the crust to the lithosphere to the whole Earth, and drag a probe through any of it to
+read the temperature and density where it sits. Ported from the "Crust" tab of PhET's
+Java simulation, with the water loading its isostasy omitted — which is what puts the
+sea floor here at a realistic abyssal depth rather than a kilometre too shallow.
+
+**Plate motion** — put two plates at a boundary, choose whether they converge or
+diverge, and watch what follows over tens of millions of years. An ocean plate against
+a continent subducts, digs a trench, and feeds a volcanic arc inland of it — the offset
+set by how far the slab travelled before it was deep enough to melt. Two continents
+cannot subduct, so they crumple into a mountain belt with a root beneath it, conserving
+the crust's cross-sectional area. Two ocean plates rift apart and make new sea floor
+that deepens as it cools. Combinations that have no physical answer, such as two
+identical ocean plates converging, are refused rather than guessed at. Ported from the
+"Plate Motion" tab; transform boundaries are out of scope, being motion into the page.
+
 The science, the sources and the model's limits are documented in
 [`doc/model.md`](doc/model.md); the code is documented in
 [`doc/implementation-notes.md`](doc/implementation-notes.md).

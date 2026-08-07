@@ -1,7 +1,68 @@
 {
   "title": "Tectonique des Plaques",
   "screens": {
-    "plateTectonics": "Tectonique des Plaques"
+    "plateTectonics": "Tectonique des Plaques",
+    "crust": "Croûte",
+    "plateMotion": "Mouvement des plaques"
+  },
+  "crust": {
+    "myCrust": "Ma croûte",
+    "temperature": "Température",
+    "cool": "Froide",
+    "warm": "Chaude",
+    "composition": "Composition",
+    "moreIron": "Plus de fer",
+    "moreSilica": "Plus de silice",
+    "thickness": "Épaisseur",
+    "thin": "Mince",
+    "thick": "Épaisse",
+    "thicknessPattern": "{{value}} km",
+    "elevationPattern": "Altitude {{value}} km",
+    "densityPattern": "Masse volumique {{value}} kg/m³",
+    "aboveSeaLevel": "au-dessus du niveau de la mer",
+    "belowSeaLevel": "sous le niveau de la mer",
+    "zoom": "Zoom",
+    "zoomCrust": "Croûte",
+    "zoomLithosphere": "Lithosphère",
+    "zoomEarth": "Terre entière"
+  },
+  "material": {
+    "title": "Vue",
+    "density": "Masse volumique",
+    "temperature": "Température",
+    "both": "Les deux",
+    "showLabels": "Afficher les étiquettes",
+    "showSeawater": "Afficher l'eau de mer",
+    "lessDense": "Moins dense",
+    "moreDense": "Plus dense",
+    "cooler": "Plus froid",
+    "hotter": "Plus chaud",
+    "probe": "Sonde",
+    "probeTemperature": "{{value}} °C",
+    "probeDensity": "{{value}} kg/m³"
+  },
+  "plateMotion": {
+    "chooseCrust": "Choisir une croûte",
+    "continental": "Continentale",
+    "youngOceanic": "Océanique jeune",
+    "oldOceanic": "Océanique ancienne",
+    "dropLeft": "Déposez une plaque ici",
+    "dropRight": "Déposez une plaque ici",
+    "boundaryType": "Type de limite",
+    "convergent": "Convergente",
+    "divergent": "Divergente",
+    "rewind": "Rembobiner",
+    "newCrust": "Nouvelle croûte",
+    "time": "Temps",
+    "speed": "Vitesse",
+    "slow": "Lente",
+    "fast": "Rapide",
+    "elapsedPattern": "{{value}} millions d'années",
+    "newCrustLabel": "Nouveau plancher océanique",
+    "trench": "Fosse",
+    "ridge": "Dorsale océanique",
+    "arc": "Arc volcanique",
+    "mountains": "Chaîne de montagnes"
   },
   "views": {
     "title": "Vue",
@@ -66,7 +127,12 @@
     "depthAxis": "Profondeur (km)",
     "distanceAxis": "Distance le long du profil (km)",
     "verticalExaggeration": "Relief exagéré ×{{value}} verticalement",
-    "relativeMotion": "{{value}} mm/an"
+    "relativeMotion": "{{value}} mm/an",
+    "crust": "Croûte",
+    "upperMantle": "Manteau supérieur",
+    "lowerMantle": "Manteau inférieur",
+    "outerCore": "Noyau externe",
+    "innerCore": "Noyau interne"
   },
   "dataSources": "Plaques : Bird (2003) · Séismes : USGS · Volcans : NOAA/GVP · Relief : NOAA · Âge du plancher : EarthByte",
   "a11y": {
@@ -121,6 +187,79 @@
         "timeSlider": "Temps géologique",
         "timeSliderHelp": "Déplacez les plaques vers le passé ou vers le futur, en millions d'années.",
         "resetTime": "Revenir à l'époque actuelle"
+      }
+    },
+    "crust": {
+      "screenSummary": {
+        "playArea": "L'aire de jeu montre une coupe de trois blocs de croûte flottant dans le manteau : croûte océanique fixe à gauche, croûte continentale fixe à droite et, au milieu, un bloc dont vous contrôlez la température, la composition et l'épaisseur. Chaque bloc se stabilise à la hauteur à laquelle il flotte.",
+        "controlArea": "L'aire de contrôle comporte trois curseurs pour le bloc central, le choix de colorer la roche selon la masse volumique, la température ou les deux, une commande de zoom et un bouton Tout réinitialiser.",
+        "interactionHint": "Épaississez le bloc central et regardez-le monter, puis rendez-le plus dense et regardez-le descendre — et remarquez qu'il s'enfonce davantage dans le manteau en même temps que sa surface baisse."
+      },
+      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}}",
+      "crustDetails": "Le bloc central mesure {{thickness}} km d'épaisseur pour une masse volumique de {{density}} kilogrammes par mètre cube.",
+      "elevationAbove": "Sa surface s'élève à {{value}} km au-dessus du niveau de la mer.",
+      "elevationBelow": "Sa surface se situe à {{value}} km sous le niveau de la mer.",
+      "colorModeDetails": "La roche est colorée selon {{mode}}.",
+      "zoomDetails": "La vue descend jusqu'{{extent}}.",
+      "controls": {
+        "temperatureSlider": "Température",
+        "temperatureSliderHelp": "Réchauffez le bloc central. La roche chaude se dilate, elle devient donc un peu moins dense et flotte un peu plus haut.",
+        "compositionSlider": "Composition",
+        "compositionSliderHelp": "Faites passer le bloc central d'une roche riche en fer à une roche riche en silice. La roche riche en fer est plus dense et flotte plus bas.",
+        "thicknessSlider": "Épaisseur",
+        "thicknessSliderHelp": "Réglez l'épaisseur du bloc central, de 4 à 70 kilomètres. Un bloc plus épais flotte plus haut et descend plus profond.",
+        "colorMode": "Colorer la roche selon",
+        "colorModeHelp": "Colorez la coupe selon la masse volumique, la température, ou les deux à la fois.",
+        "showLabels": "Afficher les étiquettes",
+        "zoom": "Zoom",
+        "zoomHelp": "Reculez de la croûte vers la lithosphère, ou vers la Terre entière avec le manteau et le noyau.",
+        "probe": "Sonde",
+        "probeHelp": "Déplacez la sonde dans la coupe pour lire la température et la masse volumique à l'endroit où elle se trouve."
+      },
+      "modeDensity": "la masse volumique",
+      "modeTemperature": "la température",
+      "modeBoth": "la masse volumique et la température à la fois",
+      "extentCrust": "à la base de la croûte",
+      "extentLithosphere": "à la base de la lithosphère",
+      "extentEarth": "au centre de la Terre"
+    },
+    "plateMotion": {
+      "screenSummary": {
+        "playArea": "L'aire de jeu montre une coupe de la limite entre deux plaques tectoniques. Tant qu'aucune plaque n'est choisie, elle est vide, avec une zone de dépôt de chaque côté. Une fois les deux côtés pourvus et un type de limite choisi, l'horloge tourne et la limite évolue : une plaque qui plonge, un océan qui s'ouvre ou des montagnes qui s'élèvent.",
+        "controlArea": "L'aire de contrôle comporte trois morceaux de croûte à faire glisser dans les zones de dépôt, un sélecteur de type de limite, des commandes de lecture, pause et pas à pas avec un curseur de vitesse, les boutons Rembobiner et Nouvelle croûte, le choix de ce qui colore la roche, et un bouton Tout réinitialiser.",
+        "interactionHint": "Placez une croûte océanique ancienne face à un continent et faites-les converger : regardez où apparaissent les volcans par rapport à la fosse."
+      },
+      "currentDetails": "{{plates}} {{motion}} {{time}}",
+      "platesNone": "Les deux zones de dépôt sont vides.",
+      "platesOne": "Une zone de dépôt contient une plaque ; l'autre est vide.",
+      "platesBoth": "Croûte {{left}} à gauche, croûte {{right}} à droite.",
+      "motionNone": "Aucun type de limite n'a encore été choisi.",
+      "motionSubduction": "Elles convergent, et la plaque de {{side}} plonge sous l'autre.",
+      "motionCollision": "Elles convergent, et aucune ne peut plonger : la croûte s'épaissit en montagnes.",
+      "motionRifting": "Elles divergent, et un nouveau plancher océanique se forme entre elles.",
+      "sideLeft": "gauche",
+      "sideRight": "droite",
+      "timeIdle": "L'horloge n'a pas démarré.",
+      "timeRunning": "{{value}} millions d'années se sont écoulées.",
+      "timeFinished": "La limite a parcouru ses {{value}} millions d'années.",
+      "controls": {
+        "crustPiece": "Croûte {{name}}",
+        "crustPieceHelp": "Faites-la glisser dans l'une des deux zones de dépôt, ou appuyez sur Entrée pour la placer dans la première zone libre.",
+        "leftDropZone": "Zone de dépôt gauche",
+        "rightDropZone": "Zone de dépôt droite",
+        "boundaryType": "Type de limite",
+        "boundaryTypeHelp": "Choisissez si les deux plaques convergent ou divergent. Seules les limites que ces deux plaques peuvent réellement former sont proposées.",
+        "rewind": "Rembobiner",
+        "rewindHelp": "Rejoue les deux mêmes plaques depuis le début.",
+        "newCrust": "Nouvelle croûte",
+        "newCrustHelp": "Retire les deux plaques et recommence.",
+        "speed": "Vitesse",
+        "speedHelp": "Combien de millions d'années passent par seconde.",
+        "colorMode": "Colorer la roche selon",
+        "colorModeHelp": "Colorez la coupe selon la masse volumique, la température, ou les deux à la fois.",
+        "showLabels": "Afficher les étiquettes",
+        "probe": "Sonde",
+        "probeHelp": "Déplacez la sonde dans la coupe pour lire la température et la masse volumique à l'endroit où elle se trouve."
       }
     }
   },

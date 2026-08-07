@@ -305,6 +305,84 @@ const PlateTectonicsColors = {
     projector: "#7a3316",
   }),
 
+  // ── Material color ramps ────────────────────────────────────────────────────
+  // The Crust and Plate Motion screens paint rock by what it *is* rather than by
+  // which layer it belongs to, so density and temperature each get a two-stop ramp
+  // interpolated per sample. Both ramps have to read as a single quantity increasing,
+  // which is why each is a lightness/saturation sweep within one hue family rather
+  // than a trip across the color wheel.
+
+  /** Least dense rock on the density ramp. */
+  densityRampLowColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "densityRampLow", {
+    default: "#e8ecf5",
+    projector: "#f2f4f8",
+  }),
+
+  /** Densest rock on the density ramp. */
+  densityRampHighColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "densityRampHigh", {
+    default: "#2a3242",
+    projector: "#1e242f",
+  }),
+
+  /** Coolest rock on the temperature ramp. */
+  temperatureRampLowColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "temperatureRampLow", {
+    default: "#5a6272",
+    projector: "#8c93a1",
+  }),
+
+  /** Hottest rock on the temperature ramp. */
+  temperatureRampHighColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "temperatureRampHigh", {
+    default: "#ff4d1a",
+    projector: "#d63200",
+  }),
+
+  // ── Deep Earth ──────────────────────────────────────────────────────────────
+  // Only visible when the Crust screen is zoomed out to the whole planet.
+
+  /** Upper mantle, above the 750 km discontinuity. */
+  upperMantleColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "upperMantle", {
+    default: "#8a3a24",
+    projector: "#c4714b",
+  }),
+
+  /** Lower mantle, below the 750 km discontinuity. */
+  lowerMantleColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "lowerMantle", {
+    default: "#6b2418",
+    projector: "#a8522f",
+  }),
+
+  /** Liquid outer core. */
+  outerCoreColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "outerCore", {
+    default: "#ffb347",
+    projector: "#e08800",
+  }),
+
+  /** Solid inner core. */
+  innerCoreColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "innerCore", {
+    default: "#fff3c4",
+    projector: "#f0c419",
+  }),
+
+  // ── Plate Motion chrome ─────────────────────────────────────────────────────
+
+  /** Outline of an empty zone waiting for a crust piece to be dropped into it. */
+  dropZoneColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "dropZone", {
+    default: "#6f7f9c",
+    projector: "#8a93a3",
+  }),
+
+  /** The same outline while a crust piece is over it, or it holds keyboard focus. */
+  dropZoneActiveColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "dropZoneActive", {
+    default: "#4fc3f7",
+    projector: "#0277bd",
+  }),
+
+  /** Crust created at a spreading ridge during the run, distinct from what was dropped in. */
+  newCrustColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "newCrust", {
+    default: "#3f6b63",
+    projector: "#5f9187",
+  }),
+
   // ── Light control surfaces ──────────────────────────────────────────────────
   // White chrome (combo boxes, flat push buttons, editable input fields) stays light
   // in both profiles; its text stays dark.

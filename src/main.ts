@@ -21,8 +21,10 @@ import "./brand.js";
 
 import { onReadyToLaunch, PreferencesModel, Sim } from "scenerystack/sim";
 import { Tandem } from "scenerystack/tandem";
+import { CrustScreen } from "./crust/CrustScreen.js";
 import { StringManager } from "./i18n/StringManager.js";
 import PlateTectonicsColors from "./PlateTectonicsColors.js";
+import { PlateMotionScreen } from "./plate-motion/PlateMotionScreen.js";
 import { PlateTectonicsScreen } from "./plate-tectonics/PlateTectonicsScreen.js";
 import { PlateTectonicsPreferencesModel } from "./preferences/PlateTectonicsPreferencesModel.js";
 import { PlateTectonicsPreferencesNode } from "./preferences/PlateTectonicsPreferencesNode.js";
@@ -37,6 +39,16 @@ onReadyToLaunch(() => {
     new PlateTectonicsScreen(simPreferences, {
       name: stringManager.getScreenNames().plateTectonicsStringProperty,
       tandem: Tandem.ROOT.createTandem("plateTectonicsScreen"),
+      backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,
+    }),
+    new CrustScreen(simPreferences, {
+      name: stringManager.getScreenNames().crustStringProperty,
+      tandem: Tandem.ROOT.createTandem("crustScreen"),
+      backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,
+    }),
+    new PlateMotionScreen(simPreferences, {
+      name: stringManager.getScreenNames().plateMotionStringProperty,
+      tandem: Tandem.ROOT.createTandem("plateMotionScreen"),
       backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,
     }),
   ];

@@ -230,3 +230,165 @@ distorting the picture silently.
 - **Hotspots do not move.** That is deliberate, and it is the physics: a plume is
   anchored in the deep mantle while the plate slides over it, which is why the Hawaiian
   chain gets older to the north-west.
+
+## The Crust screen
+
+Three blocks of crust float in the mantle. The outer two are fixed and exist to be
+compared against; the middle one is the user's, and its temperature, composition and
+thickness are the only inputs on the screen.
+
+### Airy isostasy
+
+Crust does not rest *on* the mantle, it floats *in* it, and a column's surface
+elevation is fixed by its thickness and density and nothing else. Equating lithostatic
+pressure at a compensation depth for a crustal column against a reference column gives,
+for a column standing above sea level,
+
+```
+e = t·(ρm − ρc)/ρm − C
+```
+
+and for one whose top is below sea level, where the overlying seawater is part of the
+load,
+
+```
+e = [t·(ρm − ρc) − C·ρm] / (ρm − ρw)
+```
+
+with ρm = 3300, ρw = 1030 kg/m³. The two agree at e = 0, so the response is continuous
+across the shoreline; they do not have the same *slope*, because a submarine column
+that thickens displaces water rather than air and therefore rises ρm/(ρm − ρw) ≈ 1.45
+times faster per metre of new crust.
+
+**Divergence from PhET.** The simulation this screen is ported from applied the
+subaerial formula everywhere, and so under-responded below sea level. The visible
+consequence of fixing it: the fixed oceanic block sits at −4163 m, a realistic abyssal
+depth, where PhET had it at −2864 m. The continental block is unaffected at +4682 m,
+because it is subaerial and that branch is unchanged.
+
+**The reference offset.** `AIRY_REFERENCE_OFFSET_M = 3500` is not a fudge on the
+physics — Airy isostasy on its own answers "how high does this column stand above bare
+mantle", which is useless as a datum because every real column stands kilometres above
+it. The offset re-datums the answer onto a water-covered reference column, whose depth
+`C·ρm/(ρm − ρw)` ≈ 5.1 km the code derives explicitly. The value is inherited from PhET
+so elevations stay comparable; what is new is that it is named and derived.
+
+### Crustal density
+
+Composition mixes linearly between a cold silica-rich end member (2670 kg/m³) and a
+cold iron-rich one (3230 kg/m³); temperature then expands the result thermally,
+Δρ/ρ = −α·ΔT, over a 700 K geotherm with α = 3.0 × 10⁻⁵ K⁻¹. PhET wrote this as a
+single opaque expression, `2600 + 700·(0.8·(1−c) + 0.10·(1−T))`; back-solving its
+thermal term for an expansivity gives ≈ 3.4 × 10⁻⁵ K⁻¹, so their numbers were right and
+only their presentation was not. The two agree to within 20 kg/m³ everywhere.
+
+### Temperature datum
+
+PhET's `ZERO_CELSIUS = 293.15f` is 20 °C, not 0 °C, and every temperature in both of
+its tabs is offset from that mislabelled datum. The value is kept here — it preserves
+the temperature colour ramp — under the name `SURFACE_TEMPERATURE_K`.
+
+### The Earth below
+
+Density with depth is the PREM curve, sampled at 35 depths through the mantle and
+continued through the core. PREM is derived from seismic wave speeds, so unlike
+everything else on this screen it is an *observation* of the Earth's interior rather
+than a model of it. Its top four entries describe ocean and crust, not mantle, and are
+deliberately not used: this screen draws its own crust, and reading them for the rock
+beneath a block would make the block appear to float on something lighter than itself.
+
+### What this screen does not claim
+
+- Isostatic adjustment here settles in about a second of view time. Real glacial
+  isostatic rebound has a relaxation time of order 10 ka. The animation exists to show
+  that the block *settles* rather than teleports, not to time anything.
+- The relaxation is critically damped, unlike PhET's, which was underdamped and let the
+  crust oscillate. The mantle is a viscous fluid, not a spring; a bobbing block would
+  teach a misconception.
+- Airy isostasy with the slider ranges inherited from PhET still yields +10 km at
+  70 km thickness and 2600 kg/m³ — about twice the highest real plateau. That is a
+  property of the ranges, which are kept for comparability, not of the physics.
+- Local (Airy) compensation only. Real lithosphere has flexural rigidity, so a load is
+  supported partly by the strength of the plate around it rather than entirely beneath.
+
+## The Plate Motion screen
+
+Two plates meet at a boundary and the clock runs. Everything drawn is a pure function
+of elapsed time — see [implementation-notes.md](./implementation-notes.md).
+
+### The plates
+
+| Plate | Density kg/m³ | Crust top m | Crust base m | Lithospheric mantle m |
+|---|---|---|---|---|
+| Continental | 2750 | +3500 | −40000 | 70000 |
+| Young oceanic | 3000 | −4000 | −10000 | 45000 |
+| Old oceanic | 3070 | −4000 | −10000 | 55000 |
+
+Old ocean floor is denser and its lithosphere thicker than young ocean floor because it
+has had longer to cool. That single difference is what lets the screen answer "which
+one subducts?" with age rather than composition.
+
+### What is allowed, and why
+
+| Motion | Plates | Result | Runs for |
+|---|---|---|---|
+| Convergent | continental + continental | collision | 35 Myr |
+| Convergent | any two different, at least one oceanic | subduction | 50 Myr |
+| Convergent | two identical oceanic | **refused** | — |
+| Divergent | both continental, or both oceanic | rifting | 35 Myr |
+| Divergent | one continental, one oceanic | **refused** | — |
+
+Two identical ocean plates have no density contrast to decide which goes down;
+picking one arbitrarily would imply the choice was physical. A divergent boundary
+between a continent and ocean floor is not a thing that happens — a spreading centre
+makes new crust of one kind, and it has to match what is either side.
+
+The denser plate subducts. With these densities that resolves to two rules worth taking
+away: **continental crust never subducts**, which is why continents are billions of
+years old while no ocean floor is older than 180 Ma; and **the older ocean plate goes
+down**, because it is the colder and denser one.
+
+### The slab
+
+Three circular arcs of radius 90, 40 and 90 km, turning through a quarter, a half and a
+quarter of the total dip, followed by a straight ray. The total dip is (π/4)·0.8 for
+young oceanic lithosphere and (π/4)·1.2 for old — colder, thicker lithosphere sinks
+more steeply. The shape was derived for PhET's version in a Mathematica notebook and is
+reproduced here.
+
+The curve is parameterised by **arc length**, not by angle or by horizontal distance.
+The plate is not stretching, so a point on it covers a fixed distance per million years
+whatever part of the bend it is in; any other parameterisation would make the slab
+appear to speed up and slow down as it went round the corner.
+
+### Arcs and mountains
+
+Where the slab passes through 100–150 km it dehydrates, and the released water melts the
+mantle above it. That melt is buoyant, so it rises vertically from where it was made —
+which means the volcanic arc sits inland of the trench by exactly as far as the slab
+travelled sideways in reaching melting depth. This is why arcs are offset from trenches
+by a characteristic distance rather than sitting on top of them.
+
+In a collision the convergence has nowhere to go but up and down. Crust shortening to a
+fraction *f* of its width thickens by 1/*f*, conserving cross-sectional area — the model
+walks the material rather than the screen, so the conservation is exact rather than
+approximate. About 85 % of the thickening goes down as a root and 15 % up as
+topography, which is the ratio isostasy demands and the reason mountain ranges have
+roots several times deeper than they are high.
+
+### What this screen does not claim
+
+- **Transform boundaries are out of scope.** Strike-slip motion is displacement into
+  the page, which a cross-section cannot show; PhET's version reduced to a rift valley
+  plus a symbol. Rather than draw a picture that does not carry the motion, the screen
+  offers only convergent and divergent boundaries and says so.
+- Plates move at a fixed 15 mm/year regardless of what is happening at the boundary.
+  Real plate speeds respond to slab pull and ridge push.
+- The trench is an exponential profile fitted to look right, not a solution of plate
+  flexure.
+- Magma is a single conduit at one place. Real arcs are chains of many volcanoes with
+  irregular spacing, and PhET modelled individual blobs with a Poisson process; the
+  deterministic version here looks the same and reproduces on reload.
+- Each boundary stops at a fixed time. That is a statement about when the process has
+  finished saying what it has to say, not about when it stops in the Earth.
+- No erosion, no sedimentation, no back-arc spreading, no slab rollback.

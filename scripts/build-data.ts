@@ -1019,13 +1019,12 @@ interface VolcanoBuild {
 async function buildVolcanoes(plates: readonly PlateBuild[]): Promise<VolcanoBuild[]> {
   const volcanoes: VolcanoBuild[] = [];
   let page = 1;
-  let totalPages = 1;
-  do {
+  for (;;) {
     const response = await fetchJson<{ items: readonly VolcanoLocation[]; totalPages: number }>(
       `${VOLCANO_QUERY}?itemsPerPage=100&page=${page}`,
       `volcanoes_${page}.json`,
     );
-    totalPages = response.totalPages;
+    const totalPages = response.totalPages;
     for (const item of response.items) {
       if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
         continue;
@@ -1039,7 +1038,10 @@ async function buildVolcanoes(plates: readonly PlateBuild[]): Promise<VolcanoBui
       });
     }
     page += 1;
-  } while (page <= totalPages);
+    if (page > totalPages) {
+      break;
+    }
+  }
 
   const entries = volcanoes.map(
     (volcano) =>

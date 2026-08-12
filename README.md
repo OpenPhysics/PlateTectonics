@@ -1,5 +1,7 @@
 # Plate Tectonics
 
+[![CI](https://github.com/OpenPhysics/PlateTectonics/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenPhysics/PlateTectonics/actions/workflows/ci.yml)
+
 An interactive map of the Earth's tectonic plates, built with
 [SceneryStack](https://scenerystack.org/) — and drawn from real data throughout.
 

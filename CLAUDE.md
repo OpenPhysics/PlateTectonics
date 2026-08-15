@@ -285,6 +285,7 @@ open PRs that fight the overrides. Revisit when SceneryStack drops or re-pins th
 | `tests/EarthBlockNode.test.ts` | The block's projection and its front-face inverse |
 | `tests/TerrainColors.test.ts` | The elevation ramp on the block's surface |
 | `tests/SectionPlacement.test.ts` | Both views agreeing about what a section point means |
+| `tests/SectionRulerNode.test.ts` | Tick numbering and the ruler surviving a section that gives it no room |
 | `tests/EarthMaterial.test.ts` | The two colour ramps and the combined mode |
 | `tests/IsostaticRelaxation.test.ts` | Convergence, no overshoot, frame-rate independence |
 | `tests/CrustModel.test.ts` | Slider → density → elevation chain, probe, reset |

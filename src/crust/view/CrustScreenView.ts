@@ -9,16 +9,20 @@
  * of register with the picture.
  */
 
-import { Bounds2, Vector2 } from "scenerystack/dot";
+import { Multilink } from "scenerystack/axon";
+import { Bounds2 } from "scenerystack/dot";
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
 import { Node, Rectangle } from "scenerystack/scenery";
 import { ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import { CrossSectionScale } from "../../common/model/CrossSectionScale.js";
+import type { SectionViewMode } from "../../common/model/SectionViewModel.js";
 import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/PlateTectonicsButtonOptions.js";
 import { ColorModeControlPanel } from "../../common/view/ColorModeControlPanel.js";
 import { EarthProbeNode } from "../../common/view/EarthProbeNode.js";
 import { MaterialLegendNode } from "../../common/view/MaterialLegendNode.js";
+import { blockPlacement, flatPlacement, type SectionPlacement } from "../../common/view/SectionPlacement.js";
+import { SectionRulerNode } from "../../common/view/SectionRulerNode.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import {
@@ -31,6 +35,7 @@ import {
 } from "../../PlateTectonicsConstants.js";
 import type { PlateTectonicsPreferencesModel } from "../../preferences/PlateTectonicsPreferencesModel.js";
 import type { CrustModel, CrustZoom } from "../model/CrustModel.js";
+import { CrustBlockNode } from "./CrustBlockNode.js";
 import { CrustCanvasNode } from "./CrustCanvasNode.js";
 import { CrustLabelsNode } from "./CrustLabelsNode.js";
 import { CrustScreenSummaryContent } from "./CrustScreenSummaryContent.js";
@@ -52,7 +57,9 @@ const RELIEF_BAND_FRACTION = 0.4;
 export type CrustScreenViewOptions = ScreenViewOptions;
 
 export class CrustScreenView extends ScreenView {
+  private readonly model: CrustModel;
   private readonly canvas: CrustCanvasNode;
+  private readonly block: CrustBlockNode;
   private readonly labels: CrustLabelsNode;
   /** Named sectionScale, not scale: ScreenView.scale() is a method on the base class. */
   private sectionScale: CrossSectionScale;
@@ -67,6 +74,8 @@ export class CrustScreenView extends ScreenView {
       providedOptions,
     );
     super(options);
+
+    this.model = model;
 
     const strings = StringManager.getInstance();
     const a11y = strings.getCrustA11yStrings().controls;
@@ -91,17 +100,27 @@ export class CrustScreenView extends ScreenView {
       }),
     );
 
+    // Both painters are built and kept. Only one is visible at a time, but the flat one
+    // is cheap to hold and rebuilding it on every toggle would throw away the Property
+    // links it sets up — and the toggle is a control the user is expected to flip back
+    // and forth while comparing the two pictures.
     this.canvas = new CrustCanvasNode(model, this.sectionScale, bounds);
     this.addChild(this.canvas);
 
-    this.labels = new CrustLabelsNode(model, this.sectionScale, bounds);
+    this.block = new CrustBlockNode(model, bounds, CrustScreenView.extentFor(model.zoomProperty.value));
+    this.addChild(this.block);
+
+    this.labels = new CrustLabelsNode(model, this.placement(), bounds, RELIEF_BOTTOM_M);
     this.addChild(this.labels);
 
     // ── The probe ─────────────────────────────────────────────────────────────
+    // Routed through whichever placement is current rather than through the flat scale,
+    // so the probe stays on the rock it is reading out when the view is switched. It
+    // reads `this.placement()` on every call instead of capturing one, because the
+    // placement is replaced on both a zoom change and a view change.
     const probe = new EarthProbeNode(model.probePositionProperty, {
-      modelToView: (xM, elevationM) => new Vector2(this.sectionScale.x(xM), this.sectionScale.y(elevationM)),
-      viewToModel: (viewX, viewY) =>
-        new Vector2(this.sectionScale.modelX(viewX), this.sectionScale.modelElevation(viewY)),
+      modelToView: (xM, elevationM) => this.placement().modelToView(xM, elevationM),
+      viewToModel: (viewX, viewY) => this.placement().viewToModel(viewX, viewY),
       dragBounds: bounds,
       temperatureAt: (xM, elevationM) => model.temperatureAtPoint(xM, elevationM),
       densityAt: (xM, elevationM) => model.densityAtPoint(xM, elevationM),
@@ -115,6 +134,22 @@ export class CrustScreenView extends ScreenView {
     });
     this.addChild(probe);
 
+    // ── The ruler ─────────────────────────────────────────────────────────────
+    // Back from PhET's Java version, because the block is a perspective picture with an
+    // adjustable vertical stretch and there is otherwise no way to answer "how thick is
+    // that". 150 km long: enough to span the deepest crustal root the thickness slider
+    // reaches, which is the measurement this screen invites.
+    const ruler = new SectionRulerNode(model.rulerPositionProperty, {
+      placement: this.placement(),
+      lengthM: 150000,
+      majorTickM: 50000,
+      dragBounds: bounds,
+      unitsStringProperty: strings.getMaterialStrings().kilometresStringProperty,
+      rulerAccessibleName: strings.getBlockViewA11yStrings().rulerStringProperty,
+      rulerAccessibleHelpText: strings.getBlockViewA11yStrings().rulerHelpStringProperty,
+    });
+    this.addChild(ruler);
+
     // Rebuilding the scale on a zoom change, rather than letting each consumer work it
     // out, is what guarantees the labels stay on the layers they name and the probe
     // stays at the depth it is reading out. Everything that draws against the scale has
@@ -123,9 +158,25 @@ export class CrustScreenView extends ScreenView {
     model.zoomProperty.link((zoom: CrustZoom) => {
       this.sectionScale = CrustScreenView.scaleFor(zoom, bounds);
       this.canvas.setSectionScale(this.sectionScale);
-      this.labels.setSectionScale(this.sectionScale);
+      this.block.setExtent(CrustScreenView.extentFor(zoom));
+      this.labels.setPlacement(this.placement());
       probe.refreshPosition();
+      ruler.setPlacement(this.placement());
     });
+
+    // Switching view swaps which painter is showing and re-aims everything drawn over
+    // it. The exaggeration is in here too: stretching the block moves every feature, so
+    // the labels and the probe have to be told even though nothing they own changed.
+    Multilink.multilink(
+      [model.sectionView.modeProperty, model.sectionView.verticalExaggerationProperty],
+      (mode: SectionViewMode) => {
+        this.block.visible = mode === "block";
+        this.canvas.visible = mode === "flat";
+        this.labels.setPlacement(this.placement());
+        probe.refreshPosition();
+        ruler.setPlacement(this.placement());
+      },
+    );
 
     // ── Legend ────────────────────────────────────────────────────────────────
     const legend = new MaterialLegendNode(model.colorModeProperty, {
@@ -141,6 +192,7 @@ export class CrustScreenView extends ScreenView {
     });
     const viewPanel = new ColorModeControlPanel(model.colorModeProperty, {
       showLabelsProperty: model.showLabelsProperty,
+      sectionViewModel: model.sectionView,
       colorModeAccessibleName: a11y.colorModeStringProperty,
       colorModeAccessibleHelpText: a11y.colorModeHelpStringProperty,
       showLabelsAccessibleName: a11y.showLabelsStringProperty,
@@ -171,9 +223,35 @@ export class CrustScreenView extends ScreenView {
     // a keyboard user should reach it before the controls. Reset All last, as ever.
     this.addChild(
       new Node({
-        pdomOrder: [probe, ...crustPanel.focusOrder, ...viewPanel.focusOrder, ...zoomPanel.focusOrder, resetAllButton],
+        pdomOrder: [
+          probe,
+          ruler,
+          ...crustPanel.focusOrder,
+          ...viewPanel.focusOrder,
+          ...zoomPanel.focusOrder,
+          resetAllButton,
+        ],
       }),
     );
+  }
+
+  /** How the labels and the probe reach the picture that is currently showing. */
+  private placement(): SectionPlacement {
+    return this.model.sectionView.showsBlock
+      ? blockPlacement(this.block, VIEW_HALF_WIDTH_M, this.sectionScale.bottomM)
+      : flatPlacement(this.sectionScale);
+  }
+
+  /**
+   * How much of the Earth a zoom level puts in frame.
+   *
+   * Shared by both views so that switching between them changes only *how* the slice is
+   * drawn, never *which* slice — the block gets the same extent the flat scale is built
+   * from, and maps it uniformly instead of in two bands.
+   */
+  private static extentFor(zoom: CrustZoom): { halfWidthM: number; topM: number; bottomM: number } {
+    const scale = CrustScreenView.scaleFor(zoom, SECTION_VIEW_BOUNDS);
+    return { halfWidthM: VIEW_HALF_WIDTH_M, topM: scale.topM, bottomM: scale.bottomM };
   }
 
   /**

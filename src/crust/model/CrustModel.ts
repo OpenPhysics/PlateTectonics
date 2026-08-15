@@ -25,6 +25,7 @@ import type { TModel } from "scenerystack/joist";
 import type { ColorMode } from "../../common/model/ColorMode.js";
 import { densityAt, type EarthLayer, layerAt, layerTemperatureAt } from "../../common/model/EarthStructure.js";
 import { airyElevation, crustDensity, crustGeotherm } from "../../common/model/Isostasy.js";
+import { SectionViewModel } from "../../common/model/SectionViewModel.js";
 import {
   CONTINENTAL_GEOTHERM_SPAN_K,
   CRUST_BLOCK_HALF_WIDTH_M,
@@ -105,6 +106,20 @@ export class CrustModel implements TModel {
 
   /** How far down the view reaches. */
   public readonly zoomProperty = new Property<CrustZoom>("crust");
+
+  /** Whether the screen is drawn as a 3-D block or as a flat section, and how stretched. */
+  public readonly sectionView = new SectionViewModel();
+
+  /**
+   * Left end of the ruler, in model metres.
+   *
+   * Starts low and to the left, over open mantle: the one part of either section where
+   * nothing else is drawn and no other tool or label is parked, so the ruler does not
+   * open sitting on top of the first thing the user wants to look at.
+   */
+  public readonly rulerPositionProperty = new Property<Vector2>(new Vector2(-3 * CRUST_BLOCK_HALF_WIDTH_M, -42000), {
+    valueComparisonStrategy: "equalsFunction",
+  });
 
   // ── The probe ───────────────────────────────────────────────────────────────
 
@@ -282,6 +297,8 @@ export class CrustModel implements TModel {
     this.colorModeProperty.reset();
     this.showLabelsProperty.reset();
     this.zoomProperty.reset();
+    this.sectionView.reset();
+    this.rulerPositionProperty.reset();
     this.probeInToolboxProperty.reset();
     this.probePositionProperty.reset();
 
@@ -294,6 +311,7 @@ export class CrustModel implements TModel {
 
   /** Releases the derived properties, so a discarded screen can be collected. */
   public dispose(): void {
+    this.sectionView.dispose();
     this.targetElevationProperty.dispose();
     this.crustDensityProperty.dispose();
   }

@@ -48,6 +48,8 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/plate-tectonics/view/CrossSectionNode.ts` | Section + localized annotations |
 | `src/plate-tectonics/view/LegendSwatches.ts` | Map symbols, shared by legend and checkboxes |
 | `src/common/model/ColorMode.ts` | Density / temperature / both, shared by the two schematic screens |
+| `src/common/model/SectionViewModel.ts` | Flat section vs 3-D block, and the vertical exaggeration |
+| `src/common/model/EarthCurvature.ts` | Planar arc lengths → a point on the sphere (PhET's `convertToRadial`) |
 | `src/common/model/Isostasy.ts` | Airy elevation incl. water loading, crustal density, geotherm |
 | `src/common/model/EarthStructure.ts` | PREM density table, layer boundaries and temperatures |
 | `src/common/model/CrossSectionScale.ts` | Two-band model-metres → view-pixels mapping |
@@ -56,6 +58,14 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/common/view/MaterialLegendNode.ts` | The ramp legend |
 | `src/common/view/EarthProbeNode.ts` | The draggable temperature/density probe |
 | `src/common/view/CanvasArrows.ts` | Arrow-heads and flow lines, shared by every painter |
+| `src/common/view/SceneCamera.ts` | The 3-D block's perspective projection, and the ray back out |
+| `src/common/view/QuadRenderer.ts` | Face collection, depth sort, flat shading — the depth buffer's stand-in |
+| `src/common/view/EarthBlockNode.ts` | **The 3-D block**: terrain, end walls, water, front face, camera |
+| `src/common/view/TerrainColors.ts` | The elevation ramp on the block's top surface |
+| `src/common/view/SectionPlacement.ts` | The one thing labels, the probe and the ruler need from a view |
+| `src/common/view/SectionRulerNode.ts` | The draggable ruler |
+| `src/crust/view/CrustBlockNode.ts` | The Crust screen's 3-D block |
+| `src/plate-motion/view/PlateMotionBlockNode.ts` | The Plate Motion screen's 3-D block |
 | `src/crust/model/CrustModel.ts` | Crust screen state; the three floating blocks |
 | `src/crust/model/IsostaticRelaxation.ts` | Critically damped settling toward the Airy target |
 | `src/crust/view/CrustCanvasNode.ts` | The painted Crust cross-section |
@@ -114,14 +124,28 @@ step-while-paused and the clock exact, and what makes every claim the screen mak
 unit-testable without running a clock. Do not add per-frame mutation to it — see
 [`doc/implementation-notes.md`](doc/implementation-notes.md#time-as-a-pure-parameter).
 
+**Both schematic screens draw a 3-D block by default**, with the flat cross-section kept
+as a switchable alternative (`SectionViewModel`). The block is rendered in software —
+`SceneCamera` projects, `QuadRenderer` sorts faces back to front — rather than with
+SceneryStack's `mobius`/three.js, to keep the projection a unit-tested pure function and
+three.js out of the bundle. What that costs is a depth buffer and texturing; see
+[`doc/implementation-notes.md`](doc/implementation-notes.md#the-3-d-block). **Draw-order
+groups in `BLOCK_LAYER` are spaced ten apart** so a subclass can subdivide one — coplanar
+faces on the front plane cannot be ordered by depth, so a collision there is a silent
+z-order bug.
+
+**Anything drawn over a section goes through `SectionPlacement`**, never through
+`CrossSectionScale` directly, or it will be correct in one view and wrong in the other.
+
 **Isostasy is the Crust screen's whole content**, and it deliberately diverges from
 PhET in one place: the submarine branch accounts for water loading, which PhET omitted.
 The provenance of every constant, including the `AIRY_REFERENCE_OFFSET_M` that PhET left
 as a bare `- 3500`, is in [`doc/model.md`](doc/model.md#the-crust-screen).
 
-**`Node` already has `bounds` and `scale()`**, so nodes holding a viewport or a
-`CrossSectionScale` name those fields `viewBounds` and `sectionScale`. Shadowing either
-breaks layout in ways that are hard to trace.
+**`Node` already has `bounds`, `scale()` and `renderer`**, so nodes holding a viewport, a
+`CrossSectionScale` or a `QuadRenderer` name those fields `viewBounds`, `sectionScale` and
+`faceRenderer`. Shadowing any of them breaks layout or rendering in ways that are hard to
+trace.
 
 ### Rendering
 
@@ -255,6 +279,12 @@ open PRs that fight the overrides. Revisit when SceneryStack drops or re-pins th
 | `tests/Isostasy.test.ts` | Airy elevation, both branches, and the density expression |
 | `tests/EarthStructure.test.ts` | PREM profile and the layer boundaries built on it |
 | `tests/CrossSectionScale.test.ts` | Two-band mapping, monotonicity, round trips |
+| `tests/EarthCurvature.test.ts` | The bend onto the sphere, and its inverse |
+| `tests/SceneCamera.test.ts` | Perspective projection, picking ray, framing solver |
+| `tests/QuadRenderer.test.ts` | Depth sort, layer override, culling, flat shading |
+| `tests/EarthBlockNode.test.ts` | The block's projection and its front-face inverse |
+| `tests/TerrainColors.test.ts` | The elevation ramp on the block's surface |
+| `tests/SectionPlacement.test.ts` | Both views agreeing about what a section point means |
 | `tests/EarthMaterial.test.ts` | The two colour ramps and the combined mode |
 | `tests/IsostaticRelaxation.test.ts` | Convergence, no overshoot, frame-rate independence |
 | `tests/CrustModel.test.ts` | Slider → density → elevation chain, probe, reset |

@@ -4,9 +4,9 @@
  * The accessible screen summary for the Crust screen.
  *
  * `currentDetailsContent` is derived from the model, so a screen-reader user re-reading
- * the summary hears the same four things a sighted user reads off the picture: how thick
- * and how dense the middle block is, how high it is floating, what the colours mean, and
- * how far down the view reaches. The elevation sentence switches between "above" and
+ * the summary hears the same things a sighted user reads off the picture: how thick
+ * and how dense the middle block is, how high it is floating, what the colours mean, how
+ * far down the view reaches, and whether the section is drawn flat or as a block. The elevation sentence switches between "above" and
  * "below sea level" rather than reading out a negative number, because a block at
  * −4.2 km is a sea floor, and that is the fact worth hearing.
  */
@@ -14,6 +14,7 @@
 import { DerivedStringProperty } from "scenerystack/axon";
 import { ScreenSummaryContent } from "scenerystack/sim";
 import type { ColorMode } from "../../common/model/ColorMode.js";
+import { createSectionViewDescription } from "../../common/view/sectionViewDescription.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import type { CrustModel, CrustZoom } from "../model/CrustModel.js";
 
@@ -63,14 +64,17 @@ export class CrustScreenSummaryContent extends ScreenSummaryContent {
       },
     );
 
+    const viewDetails = createSectionViewDescription(model.sectionView);
+
     const currentDetails = new DerivedStringProperty(
-      [a11y.currentDetailsStringProperty, crustDetails, elevationDetails, colorModeDetails, zoomDetails],
-      (pattern: string, crust: string, elevation: string, colorMode: string, zoom: string) =>
+      [a11y.currentDetailsStringProperty, crustDetails, elevationDetails, colorModeDetails, zoomDetails, viewDetails],
+      (pattern: string, crust: string, elevation: string, colorMode: string, zoom: string, view: string) =>
         pattern
           .replace("{{crust}}", crust)
           .replace("{{elevation}}", elevation)
           .replace("{{colorMode}}", colorMode)
-          .replace("{{zoom}}", zoom),
+          .replace("{{zoom}}", zoom)
+          .replace("{{view}}", view),
     );
 
     super({
@@ -82,6 +86,7 @@ export class CrustScreenSummaryContent extends ScreenSummaryContent {
 
     this.disposeEmitter.addListener(() => {
       currentDetails.dispose();
+      viewDetails.dispose();
       zoomDetails.dispose();
       colorModeDetails.dispose();
       elevationDetails.dispose();

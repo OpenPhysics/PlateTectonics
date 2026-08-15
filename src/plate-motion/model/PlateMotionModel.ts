@@ -28,6 +28,7 @@ import { BooleanProperty, DerivedProperty, NumberProperty, Property } from "scen
 import { Range, Vector2 } from "scenerystack/dot";
 import type { TModel } from "scenerystack/joist";
 import type { ColorMode } from "../../common/model/ColorMode.js";
+import { SectionViewModel } from "../../common/model/SectionViewModel.js";
 import { TimeModel } from "../../common/TimeModel.js";
 import {
   PLATE_MOTION_SPEED_RANGE,
@@ -97,6 +98,20 @@ export class PlateMotionModel implements TModel {
   public readonly colorModeProperty = new Property<ColorMode>("density");
   public readonly showLabelsProperty = new BooleanProperty(true);
   public readonly showSeawaterProperty = new BooleanProperty(true);
+
+  /** Whether the screen is drawn as a 3-D block or as a flat section, and how stretched. */
+  public readonly sectionView = new SectionViewModel();
+
+  /**
+   * Left end of the ruler, in model metres.
+   *
+   * Starts low and to the left, over open mantle: the one part of either section where
+   * nothing else is drawn and no other tool or label is parked, so the ruler does not
+   * open sitting on top of the first thing the user wants to look at.
+   */
+  public readonly rulerPositionProperty = new Property<Vector2>(new Vector2(-690000, -170000), {
+    valueComparisonStrategy: "equalsFunction",
+  });
 
   /** Where the probe's tip sits, in model metres (x across, elevation up). */
   public readonly probePositionProperty = new Property<Vector2>(PROBE_START, {
@@ -209,6 +224,8 @@ export class PlateMotionModel implements TModel {
     this.colorModeProperty.reset();
     this.showLabelsProperty.reset();
     this.showSeawaterProperty.reset();
+    this.sectionView.reset();
+    this.rulerPositionProperty.reset();
     this.probePositionProperty.reset();
   }
 
@@ -220,6 +237,7 @@ export class PlateMotionModel implements TModel {
     this.behaviorProperty.dispose();
     this.legalMotionTypesProperty.dispose();
     this.hasBothPlatesProperty.dispose();
+    this.sectionView.dispose();
     this.timer.dispose();
   }
 }

@@ -15,7 +15,7 @@ import { Multilink, type TReadOnlyProperty } from "scenerystack/axon";
 import type { Bounds2 } from "scenerystack/dot";
 import { Node, type NodeOptions, Rectangle, Text } from "scenerystack/scenery";
 import { PhetFont } from "scenerystack/scenery-phet";
-import type { CrossSectionScale } from "../../common/model/CrossSectionScale.js";
+import type { SectionPlacement } from "../../common/view/SectionPlacement.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import { PLATE_X_LIMIT_M } from "../../PlateTectonicsConstants.js";
@@ -35,19 +35,18 @@ export class PlateMotionLabelsNode extends Node {
   /** Named viewBounds, not bounds: Node.bounds is a property on the base class. */
   private readonly viewBounds: Bounds2;
 
-  /** Named sectionScale, not scale: Node.scale() is a method on the base class. */
-  private sectionScale: CrossSectionScale;
+  private placement: SectionPlacement;
 
   public constructor(
     model: PlateMotionModel,
-    sectionScale: CrossSectionScale,
+    placement: SectionPlacement,
     viewBounds: Bounds2,
     providedOptions?: PlateMotionLabelsNodeOptions,
   ) {
     super(providedOptions);
     this.model = model;
     this.viewBounds = viewBounds;
-    this.sectionScale = sectionScale;
+    this.placement = placement;
 
     const rebuild = Multilink.multilinkAny(
       [
@@ -64,9 +63,9 @@ export class PlateMotionLabelsNode extends Node {
     this.disposeEmitter.addListener(() => rebuild.dispose());
   }
 
-  /** Re-aims the labels at a new vertical scale. */
-  public setSectionScale(sectionScale: CrossSectionScale): void {
-    this.sectionScale = sectionScale;
+  /** Re-aims the labels, after a switch between the flat section and the block. */
+  public setPlacement(placement: SectionPlacement): void {
+    this.placement = placement;
     this.rebuild();
   }
 
@@ -102,10 +101,10 @@ export class PlateMotionLabelsNode extends Node {
       oldOceanic: motionStrings.oldOceanicStringProperty,
     };
     if (left) {
-      this.addLabel(nameFor[left], -520000, this.viewBounds.minY + 12, PLATE_LABEL_FONT);
+      this.addLabelAtViewY(nameFor[left], -520000, this.viewBounds.minY + 12, PLATE_LABEL_FONT);
     }
     if (right) {
-      this.addLabel(nameFor[right], 520000, this.viewBounds.minY + 12, PLATE_LABEL_FONT);
+      this.addLabelAtViewY(nameFor[right], 520000, this.viewBounds.minY + 12, PLATE_LABEL_FONT);
     }
 
     // ── Named features ────────────────────────────────────────────────────────
@@ -118,39 +117,51 @@ export class PlateMotionLabelsNode extends Node {
       return;
     }
 
-    const scale = this.sectionScale;
     const geometry = boundaryGeometry(motion, left, right, model.timeMillionsOfYearsProperty.value);
 
+    // Each of these is anchored to the feature it names in *model* coordinates, with only
+    // the last nudge in pixels, so a label stays on its feature whichever view is showing
+    // and whatever the block is stretched by.
     if (behavior === "subduction") {
       // The trench sits at the boundary; the arc is wherever the magma came up.
-      this.addLabel(motionStrings.trenchStringProperty, 0, scale.seaLevelY - 26, FEATURE_FONT);
+      this.addLabel(motionStrings.trenchStringProperty, 0, 0, -26, FEATURE_FONT);
       const arc = geometry.volcanoes[0];
       if (arc) {
-        this.addLabel(motionStrings.arcStringProperty, arc.xM, scale.y(arc.baseM + arc.heightM) - 16, FEATURE_FONT);
+        this.addLabel(motionStrings.arcStringProperty, arc.xM, arc.baseM + arc.heightM, -16, FEATURE_FONT);
       }
     } else if (behavior === "rifting") {
-      this.addLabel(motionStrings.ridgeStringProperty, 0, scale.seaLevelY - 26, FEATURE_FONT);
+      this.addLabel(motionStrings.ridgeStringProperty, 0, 0, -26, FEATURE_FONT);
       if (geometry.hasNewCrust) {
         this.addLabel(
           motionStrings.newCrustLabelStringProperty,
           geometry.newCrustHalfWidthM * 0.6,
-          scale.y(-4000) + 14,
+          -4000,
+          14,
           FEATURE_FONT,
         );
       }
     } else {
       const peakM = Math.max(...geometry.left.crustTop.map((point) => point.y));
-      this.addLabel(motionStrings.mountainsStringProperty, 0, scale.y(peakM) - 18, FEATURE_FONT);
+      this.addLabel(motionStrings.mountainsStringProperty, 0, peakM, -18, FEATURE_FONT);
     }
   }
 
   /** A dashed outline over one half of the play area, with an instruction inside it. */
   private addDropZone(sign: number, label: TReadOnlyProperty<string>, accessibleName: TReadOnlyProperty<string>): void {
-    const scale = this.sectionScale;
-    const inner = scale.x(sign * 20000);
-    const outer = scale.x(sign * PLATE_X_LIMIT_M);
-    const top = scale.y(20000);
-    const bottom = scale.y(-90000);
+    // Built from the four projected corners rather than from two ranges: on the block the
+    // zone's edges are not axis-aligned, and the enclosing box is what a drop target
+    // wants anyway.
+    const placement = this.placement;
+    const corners = [
+      placement.modelToView(sign * 20000, 20000),
+      placement.modelToView(sign * PLATE_X_LIMIT_M, 20000),
+      placement.modelToView(sign * PLATE_X_LIMIT_M, -90000),
+      placement.modelToView(sign * 20000, -90000),
+    ];
+    const inner = Math.min(...corners.map((point) => point.x));
+    const outer = Math.max(...corners.map((point) => point.x));
+    const top = Math.min(...corners.map((point) => point.y));
+    const bottom = Math.max(...corners.map((point) => point.y));
 
     this.addChild(
       new Rectangle(Math.min(inner, outer), top, Math.abs(outer - inner), bottom - top, {
@@ -171,13 +182,36 @@ export class PlateMotionLabelsNode extends Node {
     this.addChild(text);
   }
 
-  /** One label centred on a model x at a given view y. */
-  private addLabel(text: TReadOnlyProperty<string>, xM: number, viewY: number, font: PhetFont): void {
+  /** One label on a model point, nudged by `offsetY` pixels to clear the feature. */
+  private addLabel(
+    text: TReadOnlyProperty<string>,
+    xM: number,
+    elevationM: number,
+    offsetY: number,
+    font: PhetFont,
+  ): void {
+    const anchor = this.placement.modelToView(xM, elevationM);
+    this.addLabelAtViewY(text, xM, anchor.y + offsetY, font, anchor.x);
+  }
+
+  /**
+   * One label centred on a model x at a fixed height in the viewport.
+   *
+   * For the two plate names, which belong to the picture as a whole rather than to any
+   * feature in it and so are pinned to the top of the play area in both views.
+   */
+  private addLabelAtViewY(
+    text: TReadOnlyProperty<string>,
+    xM: number,
+    viewY: number,
+    font: PhetFont,
+    centerX = this.placement.modelToView(xM, 0).x,
+  ): void {
     this.addChild(
       new Text(text, {
         font,
         fill: PlateTectonicsColors.textColorProperty,
-        centerX: this.sectionScale.x(xM),
+        centerX,
         centerY: viewY,
         maxWidth: 180,
       }),

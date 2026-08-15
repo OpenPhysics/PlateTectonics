@@ -39,7 +39,15 @@
     "hotter": "Plus chaud",
     "probe": "Sonde",
     "probeTemperature": "{{value}} °C",
-    "probeDensity": "{{value}} kg/m³"
+    "probeDensity": "{{value}} kg/m³",
+    "sectionView": "Vue de la coupe",
+    "blockView": "Bloc 3D",
+    "flatView": "Coupe plane",
+    "verticalExaggeration": "Exagération verticale",
+    "exaggerationValue": "{{value}}×",
+    "trueScale": "échelle réelle",
+    "ruler": "Règle",
+    "kilometres": "km"
   },
   "plateMotion": {
     "chooseCrust": "Choisir une croûte",
@@ -192,10 +200,10 @@
     "crust": {
       "screenSummary": {
         "playArea": "L'aire de jeu montre une coupe de trois blocs de croûte flottant dans le manteau : croûte océanique fixe à gauche, croûte continentale fixe à droite et, au milieu, un bloc dont vous contrôlez la température, la composition et l'épaisseur. Chaque bloc se stabilise à la hauteur à laquelle il flotte.",
-        "controlArea": "L'aire de contrôle comporte trois curseurs pour le bloc central, le choix de colorer la roche selon la masse volumique, la température ou les deux, une commande de zoom et un bouton Tout réinitialiser.",
+        "controlArea": "La zone de contrôle comporte trois curseurs pour le bloc central, un choix de coloration de la roche par densité, par température ou par les deux, un choix entre un bloc en trois dimensions et une coupe plane avec un curseur d'exagération verticale, une commande de zoom et un bouton Tout réinitialiser.",
         "interactionHint": "Épaississez le bloc central et regardez-le monter, puis rendez-le plus dense et regardez-le descendre — et remarquez qu'il s'enfonce davantage dans le manteau en même temps que sa surface baisse."
       },
-      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}}",
+      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}} {{view}}",
       "crustDetails": "Le bloc central mesure {{thickness}} km d'épaisseur pour une masse volumique de {{density}} kilogrammes par mètre cube.",
       "elevationAbove": "Sa surface s'élève à {{value}} km au-dessus du niveau de la mer.",
       "elevationBelow": "Sa surface se situe à {{value}} km sous le niveau de la mer.",
@@ -226,10 +234,10 @@
     "plateMotion": {
       "screenSummary": {
         "playArea": "L'aire de jeu montre une coupe de la limite entre deux plaques tectoniques. Tant qu'aucune plaque n'est choisie, elle est vide, avec une zone de dépôt de chaque côté. Une fois les deux côtés pourvus et un type de limite choisi, l'horloge tourne et la limite évolue : une plaque qui plonge, un océan qui s'ouvre ou des montagnes qui s'élèvent.",
-        "controlArea": "L'aire de contrôle comporte trois morceaux de croûte à faire glisser dans les zones de dépôt, un sélecteur de type de limite, des commandes de lecture, pause et pas à pas avec un curseur de vitesse, les boutons Rembobiner et Nouvelle croûte, le choix de ce qui colore la roche, et un bouton Tout réinitialiser.",
+        "controlArea": "La zone de contrôle comporte trois morceaux de croûte à faire glisser dans les zones de dépôt, un sélecteur de type de limite, des commandes de lecture, pause et pas à pas avec un curseur de vitesse, les boutons Rembobiner et Nouvelle croûte, un choix de coloration de la roche, un choix entre un bloc en trois dimensions et une coupe plane avec un curseur d'exagération verticale, et un bouton Tout réinitialiser.",
         "interactionHint": "Placez une croûte océanique ancienne face à un continent et faites-les converger : regardez où apparaissent les volcans par rapport à la fosse."
       },
-      "currentDetails": "{{plates}} {{motion}} {{time}}",
+      "currentDetails": "{{plates}} {{motion}} {{time}} {{view}}",
       "platesNone": "Les deux zones de dépôt sont vides.",
       "platesOne": "Une zone de dépôt contient une plaque ; l'autre est vide.",
       "platesBoth": "Croûte {{left}} à gauche, croûte {{right}} à droite.",
@@ -261,6 +269,16 @@
         "probe": "Sonde",
         "probeHelp": "Déplacez la sonde dans la coupe pour lire la température et la masse volumique à l'endroit où elle se trouve."
       }
+    },
+    "blockView": {
+      "sectionView": "Vue de la coupe",
+      "sectionViewHelp": "Choisissez entre une coupe plane et un bloc de Terre en trois dimensions dont la face avant porte la coupe.",
+      "verticalExaggeration": "Exagération verticale",
+      "verticalExaggerationHelp": "Étirez le bloc verticalement. À un, les profondeurs et les distances à travers le bloc sont dessinées à la même échelle.",
+      "ruler": "Règle",
+      "rulerHelp": "Faites glisser la règle sur la coupe pour mesurer l'épaisseur d'une couche ou la profondeur d'un élément. Utilisez les touches fléchées pour la déplacer.",
+      "viewBlock": "La coupe est dessinée comme un bloc de Terre en trois dimensions à {{exaggeration}}.",
+      "viewFlat": "La coupe est dessinée à plat."
     }
   },
   "preferences": {

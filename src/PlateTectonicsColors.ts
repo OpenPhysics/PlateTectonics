@@ -299,6 +299,44 @@ const PlateTectonicsColors = {
     projector: "#e2560c",
   }),
 
+  // ── The ground, seen from above (the 3-D block's top surface) ───────────────
+  // Four anchors interpolated by elevation, in the bands PhET's Java TerrainNode
+  // used: greyscale sea floor below −500 m, a blend to grass through the ridge crest
+  // and the shoreline, grass to 3000 m, then a blend to snow. Java modulated all of
+  // these by a tiled noise texture that only ever brightened them, so the anchors here
+  // are the post-modulation colours rather than the raw ones — a literal port of its
+  // pure-black deep sea floor would come out far darker than the original ever looked.
+
+  /** The deepest abyssal plain, around 7 km down. */
+  terrainDeepSeabedColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "terrainDeepSeabed", {
+    default: "#2f3742",
+    projector: "#5d6875",
+  }),
+
+  /** Sea floor just below sea level — the shallow shelf. */
+  terrainShallowSeabedColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "terrainShallowSeabed", {
+    default: "#8a9099",
+    projector: "#a9b0b8",
+  }),
+
+  /** Vegetated land. PhET's EARTH_GREEN, kept exactly. */
+  terrainGrassColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "terrainGrass", {
+    default: "#526f35",
+    projector: "#6b8c47",
+  }),
+
+  /** Permanent snow on the highest ground. */
+  terrainSnowColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "terrainSnow", {
+    default: "#cccccc",
+    projector: "#f0f0f0",
+  }),
+
+  /** Ash and steam rising from an erupting arc volcano. */
+  volcanicSmokeColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "volcanicSmoke", {
+    default: "#b9b4ad",
+    projector: "#7d7871",
+  }),
+
   /** Mantle convection arrows in a cross-section. */
   convectionArrowColorProperty: new ProfileColorProperty(PlateTectonicsNamespace, "convectionArrow", {
     default: "#ffd9b0",

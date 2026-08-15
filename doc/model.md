@@ -313,10 +313,38 @@ topmost mantle value stands in for everything shallower.
 - Local (Airy) compensation only. Real lithosphere has flexural rigidity, so a load is
   supported partly by the strength of the plate around it rather than entirely beneath.
 
+### The block, and vertical exaggeration
+
+The Crust screen can be drawn flat or as a 3-D block of Earth with the section cut
+across its front face. The block is the default and is what PhET's Java version drew,
+because the claim the screen makes is about *floating*: flat, a denser block reads as a
+rectangle sliding down; as a block it reads as a landscape drowning.
+
+Three things about the block are claims rather than decoration:
+
+- **The surface is curved.** Every point is bent about the centre of the Earth by the
+  same mapping PhET used (`convertToRadial`), so sea level across the block is an arc of
+  a great circle, not a line. Over the Crust screen's 450 km that is a 4 km drop at the
+  ends; over the Plate Motion screen's 1400 km it is 38 km — more than the crust is
+  thick, which is why drawing it flat would be the larger distortion.
+- **The default is true scale.** At an exaggeration of 1 a kilometre downward and a
+  kilometre across the block are drawn the same size, and the curvature and the layer
+  thicknesses are in an honest relationship. The readout says *true scale* rather than
+  *1×* to make that the named case.
+- **The exaggeration is uniform.** Where the flat view magnifies a shallow band and
+  compresses the deep one (see [Two vertical scales](#two-vertical-scales)), the block
+  offers only a single stretch of the whole thing. A piecewise vertical map would bend
+  the layers relative to the surface they are parallel to, and the curvature would stop
+  meaning anything. The cost is that the crust is a sliver at the whole-Earth zoom
+  unless the user stretches it, which is what the slider is for.
+
 ## The Plate Motion screen
 
 Two plates meet at a boundary and the clock runs. Everything drawn is a pure function
-of elapsed time — see [implementation-notes.md](./implementation-notes.md).
+of elapsed time — see [implementation-notes.md](./implementation-notes.md). Like the
+Crust screen it can be drawn flat or as a 3-D block, on the same terms as above; the
+block is where a subduction zone reads as a trench offshore with a line of volcanoes
+inland of it, rather than as a wedge and a triangle.
 
 ### The plates
 
@@ -410,3 +438,11 @@ deeper than they are high.
 - Each boundary stops at a fixed time. That is a statement about when the process has
   finished saying what it has to say, not about when it stops in the Earth.
 - No erosion, no sedimentation, no back-arc spreading, no slab rollback.
+- **The block has no structure in the third dimension.** Everything is a
+  two-dimensional model extruded straight back, which is what a cross-section assumes:
+  the terrain does not vary front to back except for a little roughness added to high
+  ground, and the boundary is the same at the back of the block as at the front. A real
+  arc curves, a real trench is a line on a sphere, and neither is here.
+- **The smoke is decoration, not a model of an eruption.** Puffs are placed at fixed
+  phases of the clock so that Rewind and step-while-paused stay exact; nothing about
+  their size or rate is derived from the magma.

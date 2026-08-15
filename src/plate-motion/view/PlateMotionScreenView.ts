@@ -10,16 +10,20 @@
  * empty mantle.
  */
 
-import { Bounds2, Vector2 } from "scenerystack/dot";
+import { Multilink } from "scenerystack/axon";
+import { Bounds2 } from "scenerystack/dot";
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
 import { Node, Rectangle } from "scenerystack/scenery";
 import { ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import { CrossSectionScale } from "../../common/model/CrossSectionScale.js";
+import type { SectionViewMode } from "../../common/model/SectionViewModel.js";
 import { FLAT_RESET_ALL_BUTTON_OPTIONS } from "../../common/PlateTectonicsButtonOptions.js";
 import { ColorModeControlPanel } from "../../common/view/ColorModeControlPanel.js";
 import { EarthProbeNode } from "../../common/view/EarthProbeNode.js";
 import { MaterialLegendNode } from "../../common/view/MaterialLegendNode.js";
+import { blockPlacement, flatPlacement, type SectionPlacement } from "../../common/view/SectionPlacement.js";
+import { SectionRulerNode } from "../../common/view/SectionRulerNode.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import {
@@ -34,6 +38,7 @@ import type { PlateMotionModel } from "../model/PlateMotionModel.js";
 import { simpleMantleTemperatureK } from "../model/PlateThermal.js";
 import { CrustChooserPanel } from "./CrustChooserPanel.js";
 import { MotionTypeControlPanel } from "./MotionTypeControlPanel.js";
+import { PlateMotionBlockNode } from "./PlateMotionBlockNode.js";
 import { PlateMotionCanvasNode } from "./PlateMotionCanvasNode.js";
 import { PlateMotionLabelsNode } from "./PlateMotionLabelsNode.js";
 import { PlateMotionScreenSummaryContent } from "./PlateMotionScreenSummaryContent.js";
@@ -102,10 +107,24 @@ export class PlateMotionScreenView extends ScreenView {
       }),
     );
 
+    // Both painters are built and kept, and only one is visible at a time — the toggle is
+    // meant to be flipped back and forth while comparing the two pictures, and rebuilding
+    // either one on every flip would throw away the Property links it sets up.
     const canvas = new PlateMotionCanvasNode(model, sectionScale, bounds);
     this.addChild(canvas);
 
-    const labels = new PlateMotionLabelsNode(model, sectionScale, bounds);
+    const block = new PlateMotionBlockNode(model, bounds, { topM: RELIEF_TOP_M, bottomM: SECTION_BOTTOM_M });
+    this.addChild(block);
+
+    // Whichever view is showing, in the form the labels, the probe and anything else
+    // drawn over the section needs. Read on every call rather than captured, so a switch
+    // takes effect without anything having to be re-registered.
+    const placement = (): SectionPlacement =>
+      model.sectionView.showsBlock
+        ? blockPlacement(block, PLATE_X_LIMIT_M, SECTION_BOTTOM_M)
+        : flatPlacement(sectionScale);
+
+    const labels = new PlateMotionLabelsNode(model, placement(), bounds);
     this.addChild(labels);
 
     // ── The probe ─────────────────────────────────────────────────────────────
@@ -114,8 +133,8 @@ export class PlateMotionScreenView extends ScreenView {
     // than columns with a well-defined interior, and a reading that flickered as a plate
     // slid past would be worse than one that describes the medium they move through.
     const probe = new EarthProbeNode(model.probePositionProperty, {
-      modelToView: (xM, elevationM) => new Vector2(sectionScale.x(xM), sectionScale.y(elevationM)),
-      viewToModel: (viewX, viewY) => new Vector2(sectionScale.modelX(viewX), sectionScale.modelElevation(viewY)),
+      modelToView: (xM, elevationM) => placement().modelToView(xM, elevationM),
+      viewToModel: (viewX, viewY) => placement().viewToModel(viewX, viewY),
       dragBounds: bounds,
       temperatureAt: (_xM, elevationM) => simpleMantleTemperatureK(-elevationM),
       densityAt: () => MANTLE_DENSITY_KG_M3,
@@ -123,6 +142,35 @@ export class PlateMotionScreenView extends ScreenView {
       probeAccessibleHelpText: a11y.probeHelpStringProperty,
     });
     this.addChild(probe);
+
+    // ── The ruler ─────────────────────────────────────────────────────────────
+    // 300 km long, which is the depth the slab reaches before it leaves the bottom of
+    // the section — so a single placement of the ruler answers how deep subduction has
+    // got, which is the number this screen is asking the user to watch.
+    const ruler = new SectionRulerNode(model.rulerPositionProperty, {
+      placement: placement(),
+      lengthM: 300000,
+      majorTickM: 100000,
+      dragBounds: bounds,
+      unitsStringProperty: strings.getMaterialStrings().kilometresStringProperty,
+      rulerAccessibleName: strings.getBlockViewA11yStrings().rulerStringProperty,
+      rulerAccessibleHelpText: strings.getBlockViewA11yStrings().rulerHelpStringProperty,
+    });
+    this.addChild(ruler);
+
+    // Switching view swaps which painter is showing and re-aims everything drawn over it.
+    // The exaggeration is in here too: stretching the block moves every feature, so the
+    // labels and the probe have to be told even though nothing they own changed.
+    Multilink.multilink(
+      [model.sectionView.modeProperty, model.sectionView.verticalExaggerationProperty],
+      (mode: SectionViewMode) => {
+        block.visible = mode === "block";
+        canvas.visible = mode === "flat";
+        labels.setPlacement(placement());
+        probe.refreshPosition();
+        ruler.setPlacement(placement());
+      },
+    );
 
     // ── Crust chooser, above the section ──────────────────────────────────────
     this.addChild(chooser);
@@ -146,6 +194,7 @@ export class PlateMotionScreenView extends ScreenView {
     const viewPanel = new ColorModeControlPanel(model.colorModeProperty, {
       showLabelsProperty: model.showLabelsProperty,
       showSeawaterProperty: model.showSeawaterProperty,
+      sectionViewModel: model.sectionView,
       colorModeAccessibleName: a11y.colorModeStringProperty,
       colorModeAccessibleHelpText: a11y.colorModeHelpStringProperty,
       showLabelsAccessibleName: a11y.showLabelsStringProperty,
@@ -175,6 +224,7 @@ export class PlateMotionScreenView extends ScreenView {
         pdomOrder: [
           ...chooser.focusOrder,
           probe,
+          ruler,
           ...motionPanel.focusOrder,
           ...timePanel.focusOrder,
           ...viewPanel.focusOrder,

@@ -39,7 +39,15 @@
     "hotter": "Más caliente",
     "probe": "Sonda",
     "probeTemperature": "{{value}} °C",
-    "probeDensity": "{{value}} kg/m³"
+    "probeDensity": "{{value}} kg/m³",
+    "sectionView": "Vista de la sección",
+    "blockView": "Bloque 3D",
+    "flatView": "Sección plana",
+    "verticalExaggeration": "Exageración vertical",
+    "exaggerationValue": "{{value}}×",
+    "trueScale": "escala real",
+    "ruler": "Regla",
+    "kilometres": "km"
   },
   "plateMotion": {
     "chooseCrust": "Elige corteza",
@@ -192,10 +200,10 @@
     "crust": {
       "screenSummary": {
         "playArea": "El área de juego muestra un corte transversal de tres bloques de corteza que flotan en el manto: corteza oceánica fija a la izquierda, corteza continental fija a la derecha y, en el centro, un bloque cuya temperatura, composición y espesor puedes controlar. Cada bloque se asienta a la altura a la que flota.",
-        "controlArea": "El área de control tiene tres deslizadores para el bloque central, la opción de colorear la roca por densidad, por temperatura o por ambas, un control de zoom y un botón de Reiniciar todo.",
+        "controlArea": "El área de control tiene tres deslizadores para el bloque central, una opción para colorear la roca por densidad, por temperatura o por ambas, una opción entre un bloque tridimensional y una sección plana con un deslizador de exageración vertical, un control de zoom y un botón Reiniciar todo.",
         "interactionHint": "Haz el bloque central más grueso y observa cómo sube; luego hazlo más denso y observa cómo baja, y fíjate en que se hunde más en el manto al mismo tiempo que su superficie desciende."
       },
-      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}}",
+      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}} {{view}}",
       "crustDetails": "El bloque central tiene {{thickness}} km de espesor y una densidad de {{density}} kilogramos por metro cúbico.",
       "elevationAbove": "Su superficie se eleva {{value}} km sobre el nivel del mar.",
       "elevationBelow": "Su superficie se encuentra {{value}} km bajo el nivel del mar.",
@@ -226,10 +234,10 @@
     "plateMotion": {
       "screenSummary": {
         "playArea": "El área de juego muestra un corte transversal del límite entre dos placas tectónicas. Hasta que se eligen las placas está vacío, con una zona de colocación a cada lado. Cuando ambos lados tienen placa y se ha elegido un tipo de límite, el reloj avanza y el límite evoluciona: una placa que se hunde, un océano que se abre o montañas que se elevan.",
-        "controlArea": "El área de control tiene tres piezas de corteza para arrastrar a las zonas de colocación, un selector de tipo de límite, controles de reproducción, pausa y paso con un deslizador de velocidad, los botones Rebobinar y Nueva corteza, la elección de qué colorea la roca y un botón de Reiniciar todo.",
+        "controlArea": "El área de control tiene tres piezas de corteza para arrastrar a las zonas de destino, un selector de tipo de límite, controles de reproducción, pausa y paso con un deslizador de velocidad, los botones Rebobinar y Corteza nueva, una opción de qué colorea la roca, una opción entre un bloque tridimensional y una sección plana con un deslizador de exageración vertical, y un botón Reiniciar todo.",
         "interactionHint": "Pon corteza oceánica antigua frente a un continente y haz que converjan; observa dónde aparecen los volcanes respecto a la fosa."
       },
-      "currentDetails": "{{plates}} {{motion}} {{time}}",
+      "currentDetails": "{{plates}} {{motion}} {{time}} {{view}}",
       "platesNone": "Ambas zonas de colocación están vacías.",
       "platesOne": "Una zona de colocación tiene placa; la otra está vacía.",
       "platesBoth": "Corteza {{left}} a la izquierda, corteza {{right}} a la derecha.",
@@ -261,6 +269,16 @@
         "probe": "Sonda",
         "probeHelp": "Mueve la sonda por el corte transversal para leer la temperatura y la densidad donde se encuentra."
       }
+    },
+    "blockView": {
+      "sectionView": "Vista de la sección",
+      "sectionViewHelp": "Elija entre una sección plana y un bloque tridimensional de la Tierra con la sección cortada en su cara frontal.",
+      "verticalExaggeration": "Exageración vertical",
+      "verticalExaggerationHelp": "Estire el bloque verticalmente. En uno, las profundidades y las distancias a lo largo del bloque se dibujan a la misma escala.",
+      "ruler": "Regla",
+      "rulerHelp": "Arrastre la regla sobre la sección para medir el grosor de una capa o la profundidad de algo. Use las teclas de flecha para moverla.",
+      "viewBlock": "La sección se dibuja como un bloque tridimensional de la Tierra a {{exaggeration}}.",
+      "viewFlat": "La sección se dibuja plana."
     }
   },
   "preferences": {

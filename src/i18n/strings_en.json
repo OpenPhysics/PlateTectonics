@@ -39,7 +39,15 @@
     "hotter": "Hotter",
     "probe": "Probe",
     "probeTemperature": "{{value}} °C",
-    "probeDensity": "{{value}} kg/m³"
+    "probeDensity": "{{value}} kg/m³",
+    "sectionView": "Section view",
+    "blockView": "3-D block",
+    "flatView": "Flat section",
+    "verticalExaggeration": "Vertical exaggeration",
+    "exaggerationValue": "{{value}}×",
+    "trueScale": "true scale",
+    "ruler": "Ruler",
+    "kilometres": "km"
   },
   "plateMotion": {
     "chooseCrust": "Choose Crust",
@@ -192,10 +200,10 @@
     "crust": {
       "screenSummary": {
         "playArea": "The play area shows a cross-section through three blocks of crust floating in the mantle: fixed oceanic crust on the left, fixed continental crust on the right, and in the middle a block whose temperature, composition and thickness you control. Each block settles to the height at which it floats.",
-        "controlArea": "The control area has three sliders for the middle block, a choice of whether to colour the rock by density, by temperature or by both, a zoom control, and a Reset All button.",
+        "controlArea": "The control area has three sliders for the middle block, a choice of whether to colour the rock by density, by temperature or by both, a choice between a three-dimensional block and a flat section with a vertical-exaggeration slider, a zoom control, and a Reset All button.",
         "interactionHint": "Make the middle block thicker and watch it rise, then make it denser and watch it sink — and notice that it sinks deeper into the mantle at the same time as its surface drops."
       },
-      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}}",
+      "currentDetails": "{{crust}} {{elevation}} {{colorMode}} {{zoom}} {{view}}",
       "crustDetails": "The middle block is {{thickness}} km thick with a density of {{density}} kilograms per cubic metre.",
       "elevationAbove": "Its surface stands {{value}} km above sea level.",
       "elevationBelow": "Its surface lies {{value}} km below sea level.",
@@ -226,10 +234,10 @@
     "plateMotion": {
       "screenSummary": {
         "playArea": "The play area shows a cross-section through the boundary between two tectonic plates. Until plates are chosen it is empty, with a drop zone on each side. Once both sides have a plate and a boundary type has been chosen, the clock runs and the boundary evolves — a slab descending, an ocean opening, or mountains rising.",
-        "controlArea": "The control area has three crust pieces to drag into the drop zones, a boundary type chooser, play, pause and step controls with a speed slider, Rewind and New Crust buttons, a choice of what colours the rock, and a Reset All button.",
+        "controlArea": "The control area has three crust pieces to drag into the drop zones, a boundary type chooser, play, pause and step controls with a speed slider, Rewind and New Crust buttons, a choice of what colours the rock, a choice between a three-dimensional block and a flat section with a vertical-exaggeration slider, and a Reset All button.",
         "interactionHint": "Put old oceanic crust against a continent and converge them, and watch where the volcanoes appear relative to the trench."
       },
-      "currentDetails": "{{plates}} {{motion}} {{time}}",
+      "currentDetails": "{{plates}} {{motion}} {{time}} {{view}}",
       "platesNone": "Both drop zones are empty.",
       "platesOne": "One drop zone has a plate; the other is empty.",
       "platesBoth": "{{left}} crust on the left, {{right}} crust on the right.",
@@ -261,6 +269,16 @@
         "probe": "Probe",
         "probeHelp": "Move the probe through the cross-section to read the temperature and density where it sits."
       }
+    },
+    "blockView": {
+      "sectionView": "Section view",
+      "sectionViewHelp": "Choose between a flat cross-section and a three-dimensional block of Earth with the section cut across its front face.",
+      "verticalExaggeration": "Vertical exaggeration",
+      "verticalExaggerationHelp": "Stretch the block vertically. At one times, depths and distances across the block are drawn at the same scale.",
+      "ruler": "Ruler",
+      "rulerHelp": "Drag the ruler onto the cross-section to measure how thick a layer is or how deep something lies. Use the arrow keys to move it.",
+      "viewBlock": "The section is drawn as a three-dimensional block of Earth at {{exaggeration}}.",
+      "viewFlat": "The section is drawn flat."
     }
   },
   "preferences": {

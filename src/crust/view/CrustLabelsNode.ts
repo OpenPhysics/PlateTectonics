@@ -7,14 +7,21 @@
  * Scenery `Text` rather than canvas text, so every label is localizable and reachable
  * by a screen reader — the same split the rest of the sim makes between the painted
  * picture and the words on top of it.
+ *
+ * Positioned through a SectionPlacement rather than against the flat view's scale, so
+ * the same labels land on the same features whether the screen is showing the flat
+ * section or the 3-D block. Sea level is drawn as whatever polyline the placement says
+ * it is: a straight line on the flat view, an arc on the block, because sea level is a
+ * circle and a chord through it would put the horizon under the ocean.
  */
 
 import { Multilink } from "scenerystack/axon";
 import type { Bounds2 } from "scenerystack/dot";
-import { Line, Node, type NodeOptions, Text } from "scenerystack/scenery";
+import { Shape } from "scenerystack/kite";
+import { Node, type NodeOptions, Path, Text } from "scenerystack/scenery";
 import { PhetFont } from "scenerystack/scenery-phet";
-import type { CrossSectionScale } from "../../common/model/CrossSectionScale.js";
 import type { EARTH_LAYERS } from "../../common/model/EarthStructure.js";
+import type { SectionPlacement } from "../../common/view/SectionPlacement.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import {
@@ -38,19 +45,23 @@ export class CrustLabelsNode extends Node {
   /** Named viewBounds, not bounds: Node.bounds is a property on the base class. */
   private readonly viewBounds: Bounds2;
 
-  /** Named sectionScale, not scale: Node.scale() is a method on the base class. */
-  private sectionScale: CrossSectionScale;
+  private placement: SectionPlacement;
+
+  /** Elevation the "mantle" label sits at when only the crust zoom is in frame, m. */
+  private readonly mantleLabelElevationM: number;
 
   public constructor(
     model: CrustModel,
-    sectionScale: CrossSectionScale,
+    placement: SectionPlacement,
     viewBounds: Bounds2,
+    mantleLabelElevationM: number,
     providedOptions?: CrustLabelsNodeOptions,
   ) {
     super(providedOptions);
     this.model = model;
     this.viewBounds = viewBounds;
-    this.sectionScale = sectionScale;
+    this.placement = placement;
+    this.mantleLabelElevationM = mantleLabelElevationM;
 
     const rebuild = Multilink.multilinkAny(
       [model.showLabelsProperty, model.zoomProperty, model.crustElevationProperty, model.crustThicknessProperty],
@@ -60,9 +71,9 @@ export class CrustLabelsNode extends Node {
     this.disposeEmitter.addListener(() => rebuild.dispose());
   }
 
-  /** Re-aims the labels at a new vertical scale, after a zoom change. */
-  public setSectionScale(sectionScale: CrossSectionScale): void {
-    this.sectionScale = sectionScale;
+  /** Re-aims the labels, after a zoom change or a switch between the two views. */
+  public setPlacement(placement: SectionPlacement): void {
+    this.placement = placement;
     this.rebuild();
   }
 
@@ -74,17 +85,23 @@ export class CrustLabelsNode extends Node {
 
     const strings = StringManager.getInstance();
     const section = strings.getSectionStrings();
-    const scale = this.sectionScale;
+    const placement = this.placement;
     const bounds = this.viewBounds;
     const model = this.model;
 
     // ── Sea level ─────────────────────────────────────────────────────────────
     // Drawn at every zoom: without it there is no way to tell whether a block's
     // surface is a plateau or a sea floor, which is half of what the screen is about.
-    const seaLevelY = scale.seaLevelY;
-    if (seaLevelY > bounds.minY && seaLevelY < bounds.maxY) {
+    const seaLevel = placement.contour(0);
+    const seaLevelStart = seaLevel[0];
+    const seaLevelY = placement.modelToView(0, 0).y;
+    if (seaLevelStart && seaLevel.some((point) => point.y > bounds.minY && point.y < bounds.maxY)) {
+      const shape = new Shape().moveToPoint(seaLevelStart);
+      for (const point of seaLevel.slice(1)) {
+        shape.lineToPoint(point);
+      }
       this.addChild(
-        new Line(bounds.minX, seaLevelY, bounds.maxX, seaLevelY, {
+        new Path(shape, {
           stroke: PlateTectonicsColors.secondaryTextColorProperty,
           lineWidth: 1,
           lineDash: [4, 4],
@@ -95,7 +112,7 @@ export class CrustLabelsNode extends Node {
           font: SEA_LEVEL_FONT,
           fill: PlateTectonicsColors.secondaryTextColorProperty,
           left: bounds.minX + 4,
-          bottom: seaLevelY - 2,
+          bottom: seaLevelStart.y - 2,
           maxWidth: 90,
         }),
       );
@@ -115,8 +132,9 @@ export class CrustLabelsNode extends Node {
         if (!name) {
           return;
         }
-        const centreX = scale.x((column.leftM + column.rightM) / 2);
-        const surfaceY = scale.y(column.elevationM);
+        const surface = placement.modelToView((column.leftM + column.rightM) / 2, column.elevationM);
+        const centreX = surface.x;
+        const surfaceY = surface.y;
         const label = new Text(name, {
           font: BLOCK_LABEL_FONT,
           fill: PlateTectonicsColors.textColorProperty,
@@ -145,7 +163,7 @@ export class CrustLabelsNode extends Node {
   /** Labels each shell the current zoom actually reaches, centred in its band. */
   private addLayerLabels(zoom: CrustZoom): void {
     const section = StringManager.getInstance().getSectionStrings();
-    const scale = this.sectionScale;
+    const placement = this.placement;
     const bounds = this.viewBounds;
 
     const names: Record<(typeof EARTH_LAYERS)[number], typeof section.mantleStringProperty> = {
@@ -168,13 +186,13 @@ export class CrustLabelsNode extends Node {
         bottomM: -MANTLE_CORE_BOUNDARY_KM * 1000,
       },
       { layer: "outerCore", topM: -MANTLE_CORE_BOUNDARY_KM * 1000, bottomM: -INNER_OUTER_CORE_BOUNDARY_KM * 1000 },
-      { layer: "innerCore", topM: -INNER_OUTER_CORE_BOUNDARY_KM * 1000, bottomM: scale.bottomM },
+      { layer: "innerCore", topM: -INNER_OUTER_CORE_BOUNDARY_KM * 1000, bottomM: placement.bottomM },
     ];
 
     // At the crust zoom only the mantle is in frame, and it is not "upper mantle" at
     // that scale — it is just what the blocks are floating in.
     if (zoom === "crust") {
-      const topY = scale.y(scale.bandBottomM);
+      const topY = placement.modelToView(-placement.halfWidthM, this.mantleLabelElevationM).y;
       this.addChild(
         new Text(section.mantleStringProperty, {
           font: LAYER_LABEL_FONT,
@@ -188,8 +206,8 @@ export class CrustLabelsNode extends Node {
     }
 
     for (const band of bands) {
-      const topY = scale.y(band.topM);
-      const bottomY = scale.y(band.bottomM);
+      const topY = placement.modelToView(-placement.halfWidthM, band.topM).y;
+      const bottomY = placement.modelToView(-placement.halfWidthM, band.bottomM).y;
       // Skip a shell the current zoom does not reach, or one squeezed too thin to label.
       if (bottomY - topY < 18 || topY >= bounds.maxY) {
         continue;

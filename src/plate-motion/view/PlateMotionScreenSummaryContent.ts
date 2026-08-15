@@ -3,7 +3,7 @@
  *
  * The accessible screen summary for the Plate Motion screen.
  *
- * `currentDetailsContent` answers the three questions the picture answers: what is at the
+ * `currentDetailsContent` answers the questions the picture answers: what is at the
  * boundary, what it is doing, and how far through it is. The middle one names the
  * *behaviour* rather than the motion type — "the right plate is subducting beneath the
  * other" rather than "convergent" — because which plate goes down is the thing the screen
@@ -12,6 +12,7 @@
 
 import { DerivedStringProperty } from "scenerystack/axon";
 import { ScreenSummaryContent } from "scenerystack/sim";
+import { createSectionViewDescription } from "../../common/view/sectionViewDescription.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import type { BoundaryBehavior, Side } from "../model/BoundaryRules.js";
 import type { PlateMotionModel } from "../model/PlateMotionModel.js";
@@ -116,10 +117,16 @@ export class PlateMotionScreenSummaryContent extends ScreenSummaryContent {
       },
     );
 
+    const viewDetails = createSectionViewDescription(model.sectionView);
+
     const currentDetails = new DerivedStringProperty(
-      [a11y.currentDetailsStringProperty, plates, motionDetails, timeDetails],
-      (pattern: string, platesText: string, motionText: string, timeText: string) =>
-        pattern.replace("{{plates}}", platesText).replace("{{motion}}", motionText).replace("{{time}}", timeText),
+      [a11y.currentDetailsStringProperty, plates, motionDetails, timeDetails, viewDetails],
+      (pattern: string, platesText: string, motionText: string, timeText: string, viewText: string) =>
+        pattern
+          .replace("{{plates}}", platesText)
+          .replace("{{motion}}", motionText)
+          .replace("{{time}}", timeText)
+          .replace("{{view}}", viewText),
     );
 
     super({
@@ -131,6 +138,7 @@ export class PlateMotionScreenSummaryContent extends ScreenSummaryContent {
 
     this.disposeEmitter.addListener(() => {
       currentDetails.dispose();
+      viewDetails.dispose();
       timeDetails.dispose();
       motionDetails.dispose();
       plates.dispose();

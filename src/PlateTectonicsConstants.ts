@@ -243,6 +243,47 @@ export const CRUST_BLOCK_HALF_WIDTH_M = 75000;
  */
 export const ISOSTATIC_RELAXATION_TIME_CONSTANT_S = 0.6;
 
+// ── The 3-D block (Crust and Plate Motion screens) ────────────────────────────
+
+/**
+ * How far back the block extends, as a multiple of how tall it is.
+ *
+ * Set against the block's *height* rather than its width, because what this number
+ * actually controls is how much of the picture the top face takes. A face of depth D
+ * seen at the block's tilt projects to about D·sin(tilt) of screen height, against
+ * roughly the full height of the front face; at this multiple the landscape reads as a
+ * band above the section — enough to see that the section is a cut through ground —
+ * without crowding out the section itself, which is what these screens are about.
+ *
+ * This is where the port departs from PhET's Java version, which fixed the depth at
+ * 2000 km and 1000 km and then flew the camera *into* the block so that only part of it
+ * was ever in frame. Framing the whole block instead (see SceneCamera.framing) means the
+ * depth has to be chosen to look right rather than the camera distance.
+ */
+export const BLOCK_DEPTH_PER_HEIGHT = 1.6;
+
+/**
+ * Ceiling on that depth, as a fraction of the block's width.
+ *
+ * Binds when a block is far taller than it is wide — the Crust screen zoomed out to the
+ * whole Earth, where the height is 6371 km against a section 450 km across. There the
+ * landscape is not the subject and a top face scaled to the height would be all there
+ * was to see.
+ */
+export const BLOCK_MAX_DEPTH_FRACTION = 0.5;
+
+/**
+ * Range of the vertical-exaggeration slider on the 3-D block, and where it starts.
+ *
+ * Starts at 1 — true scale, which is what the Java version drew and the only scale at
+ * which the curvature of the Earth and the thickness of the crust are in an honest
+ * relationship. The top of the range is enough to keep the crust visible when the Crust
+ * screen is zoomed out to the whole Earth. See SectionViewModel for why this is a single
+ * uniform stretch rather than the flat view's two-band scale.
+ */
+export const VERTICAL_EXAGGERATION_RANGE = new Range(1, 8);
+export const VERTICAL_EXAGGERATION_DEFAULT = 1;
+
 // ── Deep Earth (Crust screen, zoomed out) ─────────────────────────────────────
 
 /** Depth to the upper/lower mantle boundary, km. */
@@ -450,6 +491,10 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   FIXED_CONTINENTAL_THICKNESS_M,
   CRUST_BLOCK_HALF_WIDTH_M,
   ISOSTATIC_RELAXATION_TIME_CONSTANT_S,
+  BLOCK_DEPTH_PER_HEIGHT,
+  BLOCK_MAX_DEPTH_FRACTION,
+  VERTICAL_EXAGGERATION_RANGE,
+  VERTICAL_EXAGGERATION_DEFAULT,
   UPPER_LOWER_MANTLE_BOUNDARY_KM,
   MANTLE_CORE_BOUNDARY_KM,
   INNER_OUTER_CORE_BOUNDARY_KM,

@@ -249,18 +249,26 @@ src/
             Isostasy.ts           Airy elevation, crustal density, crustal geotherm
             EarthStructure.ts     PREM density, layer boundaries, layer temperatures
             CrossSectionScale.ts  two-band model-metres → view-pixels mapping
+            EarthCurvature.ts     planar arc lengths → a point on a sphere
+            SectionViewModel.ts   flat or 3-D block, and the vertical stretch
     view/   EarthMaterial.ts      density and temperature colour ramps
             ColorModeControlPanel.ts   the shared "View" panel
             MaterialLegendNode.ts      the ramp legend
             EarthProbeNode.ts          the draggable temperature/density probe
+            SectionRulerNode.ts        the draggable ruler
+            SectionPlacement.ts        what anything drawn over a section needs
+            SceneCamera.ts             the block's perspective projection
+            QuadRenderer.ts            depth-sorted, flat-shaded faces
+            EarthBlockNode.ts          the 3-D block both screens share
+            TerrainColors.ts           the elevation ramp on the block's surface
             CanvasArrows.ts            arrow-heads and flow lines
   crust/          the Crust screen
   plate-motion/   the Plate Motion screen
   plate-tectonics/ the global map
 ```
 
-The three screens share the material colour ramps, the probe, the colour-mode panel and
-the vertical scale. They deliberately do **not** share a cross-section painter: the
+The three screens share the material colour ramps, the probe, the ruler, the colour-mode
+panel and the vertical scale; the two schematic ones also share the 3-D block. They deliberately do **not** share a cross-section painter: the
 global screen's `CrossSectionCanvasNode` is built from a `CrossSectionData` record and
 fits its slab to real hypocentres, none of which the other two have. Making it
 screen-agnostic would have meant inventing an interface satisfied by three unrelated
@@ -321,24 +329,104 @@ The same reasoning does *not* apply to the Crust screen's isostatic settling, wh
 genuinely a relaxation with state, and is integrated in `IsostaticRelaxation` with a
 sub-stepped semi-implicit scheme so it stays frame-rate independent by construction.
 
-## Substituting for 3-D
+## The 3-D block
 
-PhET's original ran on LWJGL with a 3-D camera. Three things did not survive the move to
-a 2-D canvas, and each was cut rather than faked:
+PhET's original ran on LWJGL with a 3-D camera, and both schematic screens were block
+diagrams rather than flat sections. That is back, rendered in software:
 
-- **Transform boundaries.** The motion is into the page. A cross-section can show the
-  rift valley that develops and nothing else, so the screen offers convergent and
-  divergent only and `doc/model.md` says why.
-- **The ruler.** The section carries its own depth and distance axes; a third
-  measurement affordance and a fourth keyboard-drag target bought no new physics.
+```
+common/model/  EarthCurvature.ts     planar arc lengths → a point on a sphere
+               SectionViewModel.ts   flat or block, and the vertical stretch
+common/view/   SceneCamera.ts        perspective projection, and the ray back out
+               QuadRenderer.ts       face collection, depth sort, flat shading
+               EarthBlockNode.ts     the block: terrain, walls, water, front face
+               TerrainColors.ts      the elevation ramp on the top surface
+               SectionPlacement.ts   the one thing labels and tools need from a view
+               SectionRulerNode.ts   the ruler, back from RulerNode3D
+crust/view/         CrustBlockNode.ts
+plate-motion/view/  PlateMotionBlockNode.ts
+```
+
+### Software 3-D rather than a 3-D library
+
+SceneryStack ships `mobius`, a three.js wrapper, and it would have given a depth buffer,
+per-vertex normals and textures. This does not use it. The pipeline needed here is one
+rotation, one translation and a perspective divide, and writing it out keeps the
+projection a pure function that is unit-tested rather than trusted, keeps the picture
+reproducible without a GPU, and keeps roughly 180 KB of gzipped three.js out of the
+bundle.
+
+What that costs is a depth buffer. `QuadRenderer` substitutes the painter's algorithm —
+faces sorted back to front — which is exact here because nothing interpenetrates: the
+terrain is a graph over the ground plane and the cross-section is a stack of bands on one
+flat sheet. Where depth genuinely cannot decide the order, an explicit `BLOCK_LAYER`
+group does, which is this renderer's version of the `moveToFrontNotifier` the Java
+version used for the same purpose. **The groups are spaced ten apart** so a subclass can
+subdivide one; Plate Motion needs four sub-orders inside `sectionRock` alone.
+
+The other cost is flat shading: one Lambert factor per face, no texture. Java modulated
+everything by a tiled noise bitmap. The grids are sampled finely enough that the ground
+reads as a surface, but a close look finds facets.
+
+### What each screen supplies
+
+`EarthBlockNode` owns the block, the terrain, the end walls, the water and the camera. A
+subclass says how high the ground is, what rock is at a point, and — if its section has
+exact layer boundaries — how to paint the front face.
+
+The default front face samples a colour per grid cell, which is what the Crust screen
+needs because its content is a continuous field. `PlateMotionBlockNode` overrides it with
+band polygons, because its layer boundaries carry the meaning and grid sampling would
+turn each of them into a staircase. That is also far cheaper, which matters because that
+screen repaints every frame while its clock runs.
+
+### Framing
+
+Java hard-coded the camera distance for a 1008 × 676 stage and flew the camera into the
+block, so only part of it was ever in frame. `SceneCamera.framing` instead solves for the
+distance that fits a given block into a given viewport, which is what lets a zoom level
+change the block and have the camera follow. The consequence is that the block's *depth*
+now has to be chosen to look right — see `BLOCK_DEPTH_PER_HEIGHT`, which is set against
+the block's height rather than its width because what it controls is how much of the
+picture the top face takes.
+
+### Everything drawn over the section
+
+The labels, the probe and the ruler are Scenery nodes, not painted pixels, so they stay
+localizable and reachable. Each therefore needs to be positioned in view coordinates, and
+each would otherwise have to know which view is showing. `SectionPlacement` is the one
+interface that keeps that in a single place: a screen picks a placement when the mode
+changes and hands the same one to everything.
+
+`contour` is part of that interface rather than something callers derive from two
+`modelToView` calls, because the two views differ in more than a transform: a line of
+constant elevation is a horizontal line when flat and an arc on the block, and drawing
+sea level as a chord would put the horizon under the ocean.
+
+### The tools
+
+The original's thermometer and density meter remain merged into one `EarthProbeNode`
+reporting both quantities at one point — not only tidier, but the screens are about
+temperature and density *not being independent*, and reading both at the same place at
+the same time is what makes that legible.
+
+The ruler is back. It was dropped on the grounds that a flat section carries its own
+implied scale; the block takes that away, being a perspective picture with a
+user-adjustable vertical stretch. It is a rigid `RulerNode` fitted to the section at its
+own position — both ends projected on every move, setting its pixel length and angle —
+which is exact at the ends and wrong by well under a tick in between, in exchange for
+keeping its numbers as real text.
+
+### Still not ported
+
+- **Transform boundaries.** The motion is into the page, and the block is a
+  two-dimensional model extruded straight back, so it cannot show them either. The screen
+  offers convergent and divergent only and `doc/model.md` says why.
 - **Manual drag-the-plates mode.** The automatic mode reaches the same states, and the
-  drag handles were a 3-D affordance that would have needed redesigning rather than
-  porting.
-
-The three separate tools of the original — thermometer, density meter, ruler — became
-one `EarthProbeNode` reporting both quantities at one point. That is not only tidier:
-the screens are about temperature and density *not being independent*, and reading both
-at the same place at the same time is what makes that legible.
+  drag handles would need redesigning rather than porting.
+- **A toolbox.** The probe and the ruler are always on screen, which is what the probe
+  already did; adding a place for them to hide would be a new affordance rather than a
+  restored one.
 
 ## Naming around the Node API
 

@@ -111,6 +111,15 @@ export class StringManager {
     return stringProperties.material;
   }
 
+  /**
+   * Accessibility strings for the 3-D block control — shared, because the control is
+   * identical on the Crust and Plate Motion screens and describing it twice would only
+   * create two things to keep in step.
+   */
+  public getBlockViewA11yStrings() {
+    return stringProperties.a11y.blockView;
+  }
+
   /** Labels for the Plate Motion screen's crust chooser, boundary types and clock. */
   public getPlateMotionStrings() {
     return stringProperties.plateMotion;

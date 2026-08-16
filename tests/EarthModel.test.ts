@@ -1,23 +1,22 @@
 /**
- * PlateTectonicsModel.test.ts
+ * EarthModel.test.ts
  *
- * The screen model: layer visibility, the earthquake depth filter, the view
- * selection, and the geological-time clock.
+ * The screen model: layer visibility, the earthquake depth filter, the choice
+ * between the globe and the flat map, and the geological-time clock.
  */
 
 import { TimeSpeed } from "scenerystack/scenery-phet";
 import { describe, expect, it } from "vitest";
+import { EarthModel, TIME_RANGE } from "../src/earth/model/EarthModel.js";
+import { depthBand, passesDepthFilter } from "../src/earth/model/EarthquakeDepthFilter.js";
 import { MYR_PER_SECOND, TIME_STEP_MYR } from "../src/PlateTectonicsConstants.js";
-import { depthBand, passesDepthFilter } from "../src/plate-tectonics/model/EarthquakeDepthFilter.js";
-import { PlateTectonicsModel, TIME_RANGE } from "../src/plate-tectonics/model/PlateTectonicsModel.js";
 
-describe("PlateTectonicsModel", () => {
-  it("starts with every layer off, at the present day, on the flat global map", () => {
-    const model = new PlateTectonicsModel();
+describe("EarthModel", () => {
+  it("starts with every layer off, at the present day, on the globe", () => {
+    const model = new EarthModel();
     expect(model.showPlatesProperty.value).toBe(false);
-    expect(model.showGlobeProperty.value).toBe(false);
-    expect(model.isFlatMapProperty.value).toBe(true);
-    expect(model.isGlobeProperty.value).toBe(false);
+    expect(model.showGlobeProperty.value).toBe(true);
+    expect(model.isFlatMapProperty.value).toBe(false);
     expect(model.showBoundariesProperty.value).toBe(false);
     expect(model.showVectorsProperty.value).toBe(false);
     expect(model.showEarthquakesProperty.value).toBe(false);
@@ -25,59 +24,42 @@ describe("PlateTectonicsModel", () => {
     expect(model.showTopographyProperty.value).toBe(false);
     expect(model.showSeafloorAgeProperty.value).toBe(false);
     expect(model.earthquakeDepthFilterProperty.value).toBe("all");
-    expect(model.selectedViewProperty.value).toBe("global");
     expect(model.timeMillionsOfYearsProperty.value).toBe(0);
     expect(model.isPresentDayProperty.value).toBe(true);
     expect(model.timer.isPlayingProperty.value).toBe(false);
   });
 
-  it("knows when a cross-section is showing", () => {
-    const model = new PlateTectonicsModel();
-    expect(model.isCrossSectionProperty.value).toBe(false);
-    model.selectedViewProperty.value = "subduction";
-    expect(model.isCrossSectionProperty.value).toBe(true);
-    model.selectedViewProperty.value = "global";
-    expect(model.isCrossSectionProperty.value).toBe(false);
-  });
-
-  it("shows exactly one of the flat map, the globe and a cross-section", () => {
-    const model = new PlateTectonicsModel();
+  it("shows exactly one of the globe and the flat map", () => {
+    const model = new EarthModel();
     const shown = (): string[] =>
-      [
-        model.isFlatMapProperty.value ? "flat" : null,
-        model.isGlobeProperty.value ? "globe" : null,
-        model.isCrossSectionProperty.value ? "section" : null,
-      ].filter((name): name is string => name !== null);
+      [model.showGlobeProperty.value ? "globe" : null, model.isFlatMapProperty.value ? "flat" : null].filter(
+        (name): name is string => name !== null,
+      );
 
+    expect(shown()).toEqual(["globe"]);
+
+    model.showGlobeProperty.value = false;
     expect(shown()).toEqual(["flat"]);
 
     model.showGlobeProperty.value = true;
     expect(shown()).toEqual(["globe"]);
-
-    // A cross-section is a slice through the Earth, so it wins over both — and the
-    // globe setting is remembered for when the global map comes back.
-    model.selectedViewProperty.value = "subduction";
-    expect(shown()).toEqual(["section"]);
-
-    model.selectedViewProperty.value = "global";
-    expect(shown()).toEqual(["globe"]);
   });
 
   it("does not advance geological time while paused", () => {
-    const model = new PlateTectonicsModel();
+    const model = new EarthModel();
     model.step(1);
     expect(model.timeMillionsOfYearsProperty.value).toBe(0);
   });
 
   it("advances one million years per second at the normal speed", () => {
-    const model = new PlateTectonicsModel();
+    const model = new EarthModel();
     model.timer.isPlayingProperty.value = true;
     model.step(1);
     expect(model.timeMillionsOfYearsProperty.value).toBeCloseTo(MYR_PER_SECOND, 6);
   });
 
   it("runs faster and slower when the speed changes", () => {
-    const model = new PlateTectonicsModel();
+    const model = new EarthModel();
     model.timer.isPlayingProperty.value = true;
 
     model.timeSpeedProperty.value = TimeSpeed.FAST;
@@ -90,7 +72,7 @@ describe("PlateTectonicsModel", () => {
   });
 
   it("stops at the end of the reconstruction range instead of wrapping", () => {
-    const model = new PlateTectonicsModel();
+    const model = new EarthModel();
     model.timer.isPlayingProperty.value = true;
     model.step(TIME_RANGE.max * 2);
 
@@ -99,7 +81,7 @@ describe("PlateTectonicsModel", () => {
   });
 
   it("steps by a fixed amount and clamps at the ends", () => {
-    const model = new PlateTectonicsModel();
+    const model = new EarthModel();
     model.stepTime(1);
     expect(model.timeMillionsOfYearsProperty.value).toBeCloseTo(TIME_STEP_MYR, 6);
 
@@ -112,7 +94,7 @@ describe("PlateTectonicsModel", () => {
   });
 
   it("resetTime returns to the present without touching the layers", () => {
-    const model = new PlateTectonicsModel();
+    const model = new EarthModel();
     model.showVolcanoesProperty.value = true;
     model.timeMillionsOfYearsProperty.value = -20;
     model.timer.isPlayingProperty.value = true;
@@ -124,9 +106,9 @@ describe("PlateTectonicsModel", () => {
   });
 
   it("reset() restores every property", () => {
-    const model = new PlateTectonicsModel();
+    const model = new EarthModel();
     model.showPlatesProperty.value = true;
-    model.showGlobeProperty.value = true;
+    model.showGlobeProperty.value = false;
     model.showBoundariesProperty.value = true;
     model.showVectorsProperty.value = true;
     model.showEarthquakesProperty.value = true;
@@ -134,14 +116,13 @@ describe("PlateTectonicsModel", () => {
     model.showTopographyProperty.value = true;
     model.showSeafloorAgeProperty.value = true;
     model.earthquakeDepthFilterProperty.value = "deep";
-    model.selectedViewProperty.value = "transform";
     model.timeSpeedProperty.value = TimeSpeed.FAST;
     model.timeMillionsOfYearsProperty.value = 33;
 
     model.reset();
 
     expect(model.showPlatesProperty.value).toBe(false);
-    expect(model.showGlobeProperty.value).toBe(false);
+    expect(model.showGlobeProperty.value).toBe(true);
     expect(model.showBoundariesProperty.value).toBe(false);
     expect(model.showVectorsProperty.value).toBe(false);
     expect(model.showEarthquakesProperty.value).toBe(false);
@@ -149,7 +130,6 @@ describe("PlateTectonicsModel", () => {
     expect(model.showTopographyProperty.value).toBe(false);
     expect(model.showSeafloorAgeProperty.value).toBe(false);
     expect(model.earthquakeDepthFilterProperty.value).toBe("all");
-    expect(model.selectedViewProperty.value).toBe("global");
     expect(model.timeSpeedProperty.value).toBe(TimeSpeed.NORMAL);
     expect(model.timeMillionsOfYearsProperty.value).toBe(0);
   });

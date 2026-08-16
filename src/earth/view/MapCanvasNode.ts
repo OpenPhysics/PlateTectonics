@@ -20,7 +20,7 @@ import type { Bounds2 } from "scenerystack/dot";
 import type { CanvasNodeOptions } from "scenerystack/scenery";
 import type { MapProjection } from "../../common/MapProjection.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
-import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
+import type { EarthModel } from "../model/EarthModel.js";
 import { EarthCanvasNode, isSeamSegment, type RingMode } from "./EarthCanvasNode.js";
 
 /** Longitude jump (degrees) that means a polyline wrapped across the antimeridian. */
@@ -51,7 +51,7 @@ export class MapCanvasNode extends EarthCanvasNode {
   private featureMinX = 0;
   private featureMaxX = 0;
 
-  public constructor(model: PlateTectonicsModel, projection: MapProjection, options?: MapCanvasNodeOptions) {
+  public constructor(model: EarthModel, projection: MapProjection, options?: MapCanvasNodeOptions) {
     super(model, projection, options);
     this.mapProjection = projection;
     this.mapBounds = projection.viewBounds;

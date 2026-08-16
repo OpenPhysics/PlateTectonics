@@ -2,7 +2,7 @@
  * geophysicalData.test.ts
  *
  * Integrity checks on the generated datasets. `npm run build-data` reaches out to
- * six public services and reshapes what they return; these tests are what stands
+ * several public services and reshapes what they return; these tests are what stands
  * between a silently mangled regeneration and a sim that draws nonsense.
  *
  * They also encode a few facts about the Earth — the Ring of Fire really is where
@@ -13,7 +13,6 @@
 import { describe, expect, it } from "vitest";
 import type { BoundaryType } from "../src/common/data/dataTypes.js";
 import { BOUNDARY_SEGMENTS } from "../src/common/data/generated/boundaryData.js";
-import { CROSS_SECTIONS } from "../src/common/data/generated/crossSectionData.js";
 import { EARTHQUAKES } from "../src/common/data/generated/earthquakeData.js";
 import { LAND_RINGS } from "../src/common/data/generated/landData.js";
 import { PLATES } from "../src/common/data/generated/plateData.js";
@@ -335,73 +334,5 @@ describe("seafloor isochrons", () => {
     // Over 160 Myr the two flanks together have opened the whole ocean.
     const oldest = flanks[flanks.length - 1] as (typeof flanks)[number];
     expect(oldest.east - oldest.west).toBeGreaterThan(40);
-  });
-});
-
-describe("cross-sections", () => {
-  it("has one profile per boundary type", () => {
-    expect(CROSS_SECTIONS.map((section) => section.key).sort()).toEqual(["divergent", "subduction", "transform"]);
-  });
-
-  it("keeps every projected feature inside its profile", () => {
-    for (const section of CROSS_SECTIONS) {
-      expect(section.lengthKm).toBeGreaterThan(100);
-      expect(section.elevationsM.length).toBeGreaterThan(100);
-      for (const elevationM of section.elevationsM) {
-        expect(elevationM).toBeGreaterThan(-11500);
-        expect(elevationM).toBeLessThan(9000);
-      }
-      for (const quake of section.earthquakes) {
-        expect(quake.distanceKm).toBeGreaterThanOrEqual(0);
-        expect(quake.distanceKm).toBeLessThanOrEqual(section.lengthKm);
-        expect(quake.depthKm).toBeGreaterThanOrEqual(0);
-      }
-      for (const volcano of section.volcanoes) {
-        expect(volcano.distanceKm).toBeGreaterThanOrEqual(0);
-        expect(volcano.distanceKm).toBeLessThanOrEqual(section.lengthKm);
-      }
-      for (const crossing of section.boundaryCrossings) {
-        expect(crossing.distanceKm).toBeGreaterThanOrEqual(0);
-        expect(crossing.distanceKm).toBeLessThanOrEqual(section.lengthKm);
-      }
-    }
-  });
-
-  it("shows a Wadati–Benioff zone that deepens away from the trench", () => {
-    const subduction = CROSS_SECTIONS.find((section) => section.key === "subduction");
-    expect(subduction).toBeDefined();
-    if (!subduction) {
-      return;
-    }
-
-    const trench = subduction.boundaryCrossings.find((crossing) => crossing.type === "convergent");
-    expect(trench, "the Chile profile must cross a trench").toBeDefined();
-    if (!trench) {
-      return;
-    }
-
-    const deepQuakes = subduction.earthquakes.filter((quake) => quake.depthKm > 300);
-    const shallowQuakes = subduction.earthquakes.filter((quake) => quake.depthKm < 70);
-    expect(deepQuakes.length).toBeGreaterThan(20);
-    expect(shallowQuakes.length).toBeGreaterThan(100);
-
-    // Shallow events hug the trench; deep ones sit hundreds of km inland, because
-    // the slab dips as it descends. That is the whole point of the section.
-    const meanDistance = (quakes: typeof deepQuakes): number =>
-      quakes.reduce((sum, quake) => sum + quake.distanceKm, 0) / quakes.length;
-    expect(meanDistance(deepQuakes)).toBeGreaterThan(meanDistance(shallowQuakes) + 200);
-  });
-
-  it("puts only shallow earthquakes on the ridge and the fault", () => {
-    for (const key of ["divergent", "transform"] as const) {
-      const section = CROSS_SECTIONS.find((candidate) => candidate.key === key);
-      expect(section).toBeDefined();
-      if (!section) {
-        continue;
-      }
-      expect(section.maxDepthKm).toBeLessThanOrEqual(70);
-      const deepest = section.earthquakes.reduce((deep, quake) => Math.max(deep, quake.depthKm), 0);
-      expect(deepest).toBeLessThan(70);
-    }
   });
 });

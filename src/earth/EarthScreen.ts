@@ -1,44 +1,44 @@
 /**
- * PlateTectonicsScreen.ts
+ * EarthScreen.ts
  *
  * The top-level Screen component. It wires together the model and view
  * factories and passes screen-level options (name, background color, tandem)
  * to the parent Screen class.
  *
  * Registered in the screens array in src/main.ts. Its home-screen and navigation-bar
- * icons come from createPlateTectonicsIcon() in src/common/PlateTectonicsScreenIcons.ts.
+ * icons come from createEarthIcon() in src/common/PlateTectonicsScreenIcons.ts.
  */
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
 import type { ScreenOptions } from "scenerystack/sim";
 import { Screen } from "scenerystack/sim";
 import type { Tandem } from "scenerystack/tandem";
-import { createPlateTectonicsIcon } from "../common/PlateTectonicsScreenIcons.js";
+import { createEarthIcon } from "../common/PlateTectonicsScreenIcons.js";
 import PlateTectonicsColors from "../PlateTectonicsColors.js";
 import type { PlateTectonicsPreferencesModel } from "../preferences/PlateTectonicsPreferencesModel.js";
-import { PlateTectonicsModel } from "./model/PlateTectonicsModel.js";
-import { PlateTectonicsKeyboardHelpContent } from "./view/PlateTectonicsKeyboardHelpContent.js";
-import { PlateTectonicsScreenView } from "./view/PlateTectonicsScreenView.js";
+import { EarthModel } from "./model/EarthModel.js";
+import { EarthKeyboardHelpContent } from "./view/EarthKeyboardHelpContent.js";
+import { EarthScreenView } from "./view/EarthScreenView.js";
 
 // Require tandem to be explicit — accidental omission would break PhET-iO.
-type PlateTectonicsScreenOptions = ScreenOptions & { tandem: Tandem };
+type EarthScreenOptions = ScreenOptions & { tandem: Tandem };
 
-export class PlateTectonicsScreen extends Screen<PlateTectonicsModel, PlateTectonicsScreenView> {
-  public constructor(preferences: PlateTectonicsPreferencesModel, options: PlateTectonicsScreenOptions) {
+export class EarthScreen extends Screen<EarthModel, EarthScreenView> {
+  public constructor(preferences: PlateTectonicsPreferencesModel, options: EarthScreenOptions) {
     super(
       // Model factory — called once when the screen is first shown
-      () => new PlateTectonicsModel(),
+      () => new EarthModel(),
       // View factory — receives the model instance, plus the sim-level preferences
       // it needs (whether plate names are drawn on the map).
       (model) =>
-        new PlateTectonicsScreenView(model, preferences, {
+        new EarthScreenView(model, preferences, {
           tandem: options.tandem.createTandem("view"),
         }),
-      optionize<PlateTectonicsScreenOptions, EmptySelfOptions, ScreenOptions>()(
+      optionize<EarthScreenOptions, EmptySelfOptions, ScreenOptions>()(
         {
           backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,
-          createKeyboardHelpNode: () => new PlateTectonicsKeyboardHelpContent(),
-          homeScreenIcon: createPlateTectonicsIcon(),
-          navigationBarIcon: createPlateTectonicsIcon(),
+          createKeyboardHelpNode: () => new EarthKeyboardHelpContent(),
+          homeScreenIcon: createEarthIcon(),
+          navigationBarIcon: createEarthIcon(),
         },
         options,
       ),

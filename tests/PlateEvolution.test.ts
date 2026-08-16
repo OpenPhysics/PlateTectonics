@@ -23,8 +23,8 @@ import type { BoundaryType } from "../src/common/data/dataTypes.js";
 import { BOUNDARY_SEGMENTS } from "../src/common/data/generated/boundaryData.js";
 import { PLATES } from "../src/common/data/generated/plateData.js";
 import { MOTION_FRAMES, PlateReconstruction } from "../src/common/PlateReconstruction.js";
+import { TIME_RANGE } from "../src/earth/model/EarthModel.js";
 import { EARTH_RADIUS_KM } from "../src/PlateTectonicsConstants.js";
-import { TIME_RANGE } from "../src/plate-tectonics/model/PlateTectonicsModel.js";
 
 const DEG_TO_RAD = Math.PI / 180;
 

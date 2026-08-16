@@ -1,12 +1,12 @@
 /**
- * PlateTectonicsScreenView.ts
+ * EarthScreenView.ts
  *
  * Lays the screen out and wires the view together:
  *
  *   ┌──────────────────────────────────────────┬───────────────┐
- *   │ title                                    │ view selector │
+ *   │ title                                    │ view switch   │
  *   │ ┌──────────────────────────────────────┐ ├───────────────┤
- *   │ │ global map  ·or·  cross-section      │ │ layers        │
+ *   │ │ globe  ·or·  flat map                │ │ layers        │
  *   │ └──────────────────────────────────────┘ │ depth filter  │
  *   │ legend                                   ├───────────────┤
  *   │                                          │ geological    │
@@ -14,14 +14,14 @@
  *   │                                    reset │               │
  *   └──────────────────────────────────────────┴───────────────┘
  *
- * The flat map, the globe and the cross-section share one viewport; the view selector
- * and the globe checkbox decide which of the three is visible. The relief raster is
- * fetched here, once, and handed to both map canvases when it has decoded.
+ * The flat map and the globe share one viewport, and the view switch decides which of
+ * the two is visible. The relief raster is fetched here, once, and handed to both map
+ * canvases when it has decoded.
  *
  * Both global views can be moved: the globe turns, and the flat map pans and zooms.
  * Their cameras live here in the view rather than in the model, because a camera is
  * a way of looking at the Earth rather than a fact about it — which is why Reset All
- * puts both of them back through {@link PlateTectonicsScreenView.reset}.
+ * puts both of them back through {@link EarthScreenView.reset}.
  */
 
 import { Shape } from "scenerystack/kite";
@@ -42,51 +42,50 @@ import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import { MAP_VIEW_BOUNDS, PANEL_SPACING, SCREEN_VIEW_MARGIN } from "../../PlateTectonicsConstants.js";
 import type { PlateTectonicsPreferencesModel } from "../../preferences/PlateTectonicsPreferencesModel.js";
-import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
-import { CrossSectionNode } from "./CrossSectionNode.js";
+import type { EarthModel } from "../model/EarthModel.js";
+import { EarthScreenSummaryContent } from "./EarthScreenSummaryContent.js";
 import { GlobeCanvasNode } from "./GlobeCanvasNode.js";
 import { LayerControlPanel } from "./LayerControlPanel.js";
 import { MapCanvasNode } from "./MapCanvasNode.js";
 import { MapLegendNode } from "./MapLegendNode.js";
 import { PlateOverlayNode } from "./PlateOverlayNode.js";
-import { PlateTectonicsScreenSummaryContent } from "./PlateTectonicsScreenSummaryContent.js";
 import { TimeControlPanel } from "./TimeControlPanel.js";
 import { ViewControlPanel } from "./ViewControlPanel.js";
 
 const TITLE_FONT = new PhetFont({ size: 17, weight: "bold" });
 const NOTE_FONT = new PhetFont(11);
 
-export type PlateTectonicsScreenViewOptions = ScreenViewOptions;
+export type EarthScreenViewOptions = ScreenViewOptions;
 
 /** Gap between the zoom buttons and the corner of the viewport they sit in. */
 const ZOOM_BUTTON_MARGIN = 6;
 
-export class PlateTectonicsScreenView extends ScreenView {
+export class EarthScreenView extends ScreenView {
   private readonly mapCanvas: MapCanvasNode;
   private readonly globeCanvas: GlobeCanvasNode;
   private readonly mapProjection: MapProjection;
   private readonly globeProjection: GlobeProjection;
 
   public constructor(
-    model: PlateTectonicsModel,
+    model: EarthModel,
     preferences: PlateTectonicsPreferencesModel,
-    providedOptions?: PlateTectonicsScreenViewOptions,
+    providedOptions?: EarthScreenViewOptions,
   ) {
-    const options = optionize<PlateTectonicsScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
-      { screenSummaryContent: new PlateTectonicsScreenSummaryContent(model) },
+    const options = optionize<EarthScreenViewOptions, EmptySelfOptions, ScreenViewOptions>()(
+      { screenSummaryContent: new EarthScreenSummaryContent(model) },
       providedOptions,
     );
     super(options);
 
     const strings = StringManager.getInstance();
-    const a11y = strings.getPlateTectonicsA11yStrings().controls;
+    const a11y = strings.getEarthA11yStrings().controls;
     this.mapProjection = new MapProjection(MAP_VIEW_BOUNDS);
     this.globeProjection = new GlobeProjection(MAP_VIEW_BOUNDS);
 
     // ── Viewport ──────────────────────────────────────────────────────────────
-    // Three things share the viewport: the flat map, the globe, and a cross-section.
-    // Each carries its own plate-label overlay, because the labels are positioned by
-    // the projection they belong to.
+    // Two things share the viewport: the flat map and the globe. Each carries its own
+    // plate-label overlay, because the labels are positioned by the projection they
+    // belong to.
     this.mapCanvas = new MapCanvasNode(model, this.mapProjection);
     const flatOverlay = new PlateOverlayNode(model, this.mapProjection);
     // The canvas clips its own painting; the labels are Scenery nodes, so once the
@@ -126,8 +125,6 @@ export class PlateTectonicsScreenView extends ScreenView {
     // globe rather than the empty rectangle it sits in.
     globeView.focusHighlight = globeDiscShape;
 
-    const crossSectionView = new CrossSectionNode(model, MAP_VIEW_BOUNDS);
-
     const viewportFrame = new Rectangle(MAP_VIEW_BOUNDS, {
       stroke: PlateTectonicsColors.mapFrameColorProperty,
       lineWidth: 1.5,
@@ -158,7 +155,6 @@ export class PlateTectonicsScreenView extends ScreenView {
 
     this.addChild(flatView);
     this.addChild(globeView);
-    this.addChild(crossSectionView);
     this.addChild(viewportFrame);
     this.addChild(mapZoomButtons);
 
@@ -166,11 +162,8 @@ export class PlateTectonicsScreenView extends ScreenView {
       flatView.visible = isFlatMap;
       mapZoomButtons.visible = isFlatMap;
     });
-    model.isGlobeProperty.link((isGlobe: boolean) => {
-      globeView.visible = isGlobe;
-    });
-    model.isCrossSectionProperty.link((isCrossSection: boolean) => {
-      crossSectionView.visible = isCrossSection;
+    model.showGlobeProperty.link((showGlobe: boolean) => {
+      globeView.visible = showGlobe;
     });
     preferences.showPlateLabelsProperty.link((showLabels: boolean) => {
       flatOverlay.visible = showLabels;
@@ -178,7 +171,7 @@ export class PlateTectonicsScreenView extends ScreenView {
     });
 
     // ── Title and reconstruction note ─────────────────────────────────────────
-    const title = new Text(strings.getScreenNames().plateTectonicsStringProperty, {
+    const title = new Text(strings.getScreenNames().earthStringProperty, {
       font: TITLE_FONT,
       fill: PlateTectonicsColors.textColorProperty,
       left: MAP_VIEW_BOUNDS.minX,
@@ -207,11 +200,7 @@ export class PlateTectonicsScreenView extends ScreenView {
     this.addChild(legend);
 
     // ── Control column ────────────────────────────────────────────────────────
-    // The combo-box list has to be added above everything else, so it gets its own
-    // parent Node placed last in the z-order.
-    const comboBoxListParent = new Node();
-
-    const viewPanel = new ViewControlPanel(model, comboBoxListParent, {
+    const viewPanel = new ViewControlPanel(model, {
       right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
       top: MAP_VIEW_BOUNDS.minY,
     });
@@ -240,7 +229,6 @@ export class PlateTectonicsScreenView extends ScreenView {
       bottom: this.layoutBounds.maxY - SCREEN_VIEW_MARGIN,
     });
     this.addChild(resetAllButton);
-    this.addChild(comboBoxListParent);
 
     // ── Relief raster ─────────────────────────────────────────────────────────
     this.loadReliefImage();
@@ -252,9 +240,9 @@ export class PlateTectonicsScreenView extends ScreenView {
     this.addChild(
       new Node({
         pdomOrder: [
+          globeView,
           flatView,
           mapZoomButtons,
-          globeView,
           ...viewPanel.focusOrder,
           ...layerPanel.focusOrder,
           ...timePanel.focusOrder,
@@ -284,8 +272,8 @@ export class PlateTectonicsScreenView extends ScreenView {
   }
 
   /**
-   * Cross-section animation is driven by the model clock, which the Sim steps; the
-   * canvas nodes repaint from their Property links, so nothing is needed here.
+   * The reconstruction is driven by the model clock, which the Sim steps; the canvas
+   * nodes repaint from their Property links, so nothing is needed here.
    */
   public override step(_dt: number): void {
     // Intentionally empty — see the class documentation.

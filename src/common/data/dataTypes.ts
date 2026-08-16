@@ -143,48 +143,64 @@ export interface HotspotRecord {
   readonly lat: number;
 }
 
-/** Where a plate boundary crosses a cross-section profile. */
-export interface BoundaryCrossing {
-  /** Distance from the profile's left-hand end, km. */
-  readonly distanceKm: number;
-  readonly type: BoundaryType;
-  /** PB2002 boundary name, e.g. `"NZ-SA"`. */
-  readonly plates: string;
-  /** Relative velocity across the boundary at the crossing, mm/year. */
-  readonly velocityMmPerYear: number;
+// ── Deep time ─────────────────────────────────────────────────────────────────
+//
+// The Deep Time screen is driven by a published *reconstruction* — Müller et al.
+// (2019) — rather than by extrapolating today's velocities, and that changes the
+// shape of the data in one important way. See `doc/model.md` for the provenance and
+// `DeepTimeReconstruction.ts` for how the two halves below are used together.
+//
+// A coastline is a static feature cookie-cut by plate ID: it has present-day
+// geometry, and reconstructing it is one rigid rotation of that geometry. So it is
+// stored once and moved by {@link HISTORY_ROTATIONS}, which lets it move continuously.
+//
+// A plate polygon is not. It has no present-day geometry to rotate — it is rebuilt
+// at each instant from whichever boundary features bounded it then, and plates
+// themselves appear and vanish as ocean basins open and close. So it is baked per
+// time step, in {@link PlateHistorySnapshot}.
+
+/** One coastline piece, and the plate that carries it through time. */
+export interface HistoryCoastline {
+  /** Row of `HISTORY_ROTATIONS` giving this piece's motion. */
+  readonly rotationSlot: number;
+  /** Present-day flat `[lon, lat, …]` polyline in degrees. */
+  readonly coords: readonly number[];
 }
 
-/** An earthquake projected onto a cross-section profile. */
-export interface SectionEarthquake {
-  readonly distanceKm: number;
-  readonly depthKm: number;
-  readonly magnitude: number;
-}
-
-/** A volcano projected onto a cross-section profile. */
-export interface SectionVolcano {
-  readonly distanceKm: number;
-  readonly elevationM: number;
+/** One plate (or deforming belt) as it stood at a single reconstructed instant. */
+export interface HistoryPlate {
+  /** GPlates reconstruction plate ID, stable across snapshots so colours do not flicker. */
+  readonly plateId: number;
+  /** The model's own name for the topology, e.g. `"Pacific"`. */
   readonly name: string;
+  /**
+   * True for a deforming belt — an orogen or a rift — rather than a rigid plate.
+   * The Earth screen treats plate interiors as rigid and says so; this
+   * model does not, and draws the deforming belts separately.
+   */
+  readonly deforming: boolean;
+  /** Closed outline as a flat `[lon, lat, …]` ring in degrees. */
+  readonly ring: readonly number[];
 }
 
-/** Which cross-section (or the global map) is on screen. */
-export type ViewKey = "global" | "subduction" | "divergent" | "transform";
+/** Everything the reconstruction says about one instant. */
+export interface PlateHistorySnapshot {
+  /** Millions of years before the present. Zero is today. */
+  readonly timeMa: number;
+  readonly plates: readonly HistoryPlate[];
+  readonly boundaries: readonly HistoryBoundarySet[];
+}
 
-/** Everything needed to draw one boundary cross-section. */
-export interface CrossSectionData {
-  readonly key: Exclude<ViewKey, "global">;
-  /** Total profile length, km. */
-  readonly lengthKm: number;
-  /** Deepest depth to draw, km — 700 for a subduction zone, tens of km for a ridge or fault. */
-  readonly maxDepthKm: number;
-  /** Evenly spaced surface elevations (metres) from the profile start to its end. */
-  readonly elevationsM: readonly number[];
-  readonly boundaryCrossings: readonly BoundaryCrossing[];
-  readonly earthquakes: readonly SectionEarthquake[];
-  readonly volcanoes: readonly SectionVolcano[];
-  /** Half-width of the corridor of real data projected onto the profile, km. */
-  readonly corridorHalfWidthKm: number;
-  /** Description of the earthquake catalogue used for this section. */
-  readonly earthquakeDescription: string;
+/**
+ * Every boundary of one kind at one instant, gathered into a single record.
+ *
+ * A resolved instant has some four hundred separate boundary pieces, and giving each
+ * its own object would spend more of the generated file on punctuation than on
+ * coordinates. They are grouped by kind instead, which is also exactly how they are
+ * painted: one canvas path per colour.
+ */
+export interface HistoryBoundarySet {
+  readonly type: BoundaryType;
+  /** Each entry is one flat `[lon, lat, …]` polyline in degrees. */
+  readonly lines: readonly (readonly number[])[];
 }

@@ -1,13 +1,15 @@
 /**
- * TimeControlPanel.ts
+ * DeepTimeClockPanel.ts
  *
- * Geological-time controls: a slider that scrubs plate positions from 50 million
- * years in the past to 50 million years into the future, play/pause/step buttons
- * with a speed setting, and a readout of where in time the reconstruction is.
+ * The geological clock: a slider from the present day back to 250 million years ago,
+ * play/pause/step buttons with a speed setting, and a readout of the age on screen.
  *
- * One second of wall-clock time is one million years at the normal speed, which is
- * the point of the whole panel: plate motion is imperceptible on a human timescale
- * and obvious on a geological one.
+ * ── Why the slider runs the way it does ───────────────────────────────────────
+ * Left is today and right is the deep past, which is how an age is quoted — "250 Ma"
+ * is a bigger number than "50 Ma" — and the reverse of the Earth screen's slider,
+ * where the middle is the present and both directions are available. That screen
+ * extrapolates today's velocities and can therefore run forwards; this one replays a
+ * published reconstruction, and there is nothing published about the future.
  */
 
 import { DerivedProperty, DerivedStringProperty, PatternStringProperty } from "scenerystack/axon";
@@ -23,8 +25,8 @@ import {
 import { PlateTectonicsPanel, type PlateTectonicsPanelOptions } from "../../common/PlateTectonicsPanel.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
-import { CONTROL_PANEL_WIDTH, PRESENT_DAY_TOLERANCE_MYR, TIME_STEP_MYR } from "../../PlateTectonicsConstants.js";
-import { type PlateTectonicsModel, TIME_RANGE } from "../model/PlateTectonicsModel.js";
+import { CONTROL_PANEL_WIDTH, DEEP_TIME_STEP_MYR, PRESENT_DAY_TOLERANCE_MYR } from "../../PlateTectonicsConstants.js";
+import { DEEP_TIME_RANGE, type DeepTimeModel } from "../model/DeepTimeModel.js";
 
 const TITLE_FONT = new PhetFont({ size: 14, weight: "bold" });
 const READOUT_FONT = new PhetFont({ size: 14, weight: "bold" });
@@ -34,52 +36,44 @@ const NOTE_FONT = new PhetFont(10);
 const SLIDER_TRACK_SIZE = new Dimension2(CONTROL_PANEL_WIDTH - 60, 4);
 const SLIDER_THUMB_SIZE = new Dimension2(13, 24);
 
-/** Major slider ticks every 25 Myr, minor ticks every 10 Myr. */
-const MAJOR_TICK_MYR = 25;
-const MINOR_TICK_MYR = 10;
+/** Major slider ticks every 50 Myr, minor ticks every 25 Myr. */
+const MAJOR_TICK_MYR = 50;
+const MINOR_TICK_MYR = 25;
 
-export type TimeControlPanelOptions = PlateTectonicsPanelOptions;
+export type DeepTimeClockPanelOptions = PlateTectonicsPanelOptions;
 
-export class TimeControlPanel extends PlateTectonicsPanel {
+export class DeepTimeClockPanel extends PlateTectonicsPanel {
   /** The interactive children, in the order the user should reach them. */
   public readonly focusOrder: Node[];
 
-  public constructor(model: PlateTectonicsModel, providedOptions?: TimeControlPanelOptions) {
+  public constructor(model: DeepTimeModel, providedOptions?: DeepTimeClockPanelOptions) {
     const strings = StringManager.getInstance();
-    const timeStrings = strings.getTimeStrings();
-    const a11y = strings.getPlateTectonicsA11yStrings().controls;
+    const deepTime = strings.getDeepTimeStrings();
+    const a11y = strings.getDeepTimeA11yStrings().controls;
 
-    // "Present day" / "12 million years ago" / "12 million years from now".
-    const pastReadout = new PatternStringProperty(timeStrings.pastStringProperty, {
-      value: new DerivedProperty([model.timeMillionsOfYearsProperty], (time: number) => Math.abs(time).toFixed(1)),
-    });
-    const futureReadout = new PatternStringProperty(timeStrings.futureStringProperty, {
-      value: new DerivedProperty([model.timeMillionsOfYearsProperty], (time: number) => time.toFixed(1)),
+    const ageReadout = new PatternStringProperty(deepTime.ageStringProperty, {
+      value: new DerivedProperty([model.timeMaProperty], (time: number) => time.toFixed(0)),
     });
     const readoutProperty = new DerivedStringProperty(
-      [model.timeMillionsOfYearsProperty, timeStrings.presentStringProperty, pastReadout, futureReadout],
-      (time: number, present: string, past: string, future: string) => {
-        if (Math.abs(time) <= PRESENT_DAY_TOLERANCE_MYR) {
-          return present;
-        }
-        return time < 0 ? past : future;
-      },
+      [model.timeMaProperty, deepTime.presentStringProperty, ageReadout],
+      (time: number, present: string, age: string) => (time <= PRESENT_DAY_TOLERANCE_MYR ? present : age),
     );
 
-    const slider = new HSlider(model.timeMillionsOfYearsProperty, TIME_RANGE, {
+    const slider = new HSlider(model.timeMaProperty, DEEP_TIME_RANGE, {
       trackSize: SLIDER_TRACK_SIZE,
       thumbSize: SLIDER_THUMB_SIZE,
       trackFillEnabled: PlateTectonicsColors.controlSurfaceColorProperty,
       trackStroke: PlateTectonicsColors.panelBorderColorProperty,
       thumbFill: PlateTectonicsColors.accentColorProperty,
-      constrainValue: (value: number) => Math.round(value / TIME_STEP_MYR) * TIME_STEP_MYR,
-      keyboardStep: 1,
-      shiftKeyboardStep: TIME_STEP_MYR,
-      pageKeyboardStep: 10,
+      // Free rather than snapped to the snapshot step: the continents move
+      // continuously, and letting the slider land between snapshots is what shows it.
+      keyboardStep: DEEP_TIME_STEP_MYR,
+      shiftKeyboardStep: 1,
+      pageKeyboardStep: MINOR_TICK_MYR,
       accessibleName: a11y.timeSliderStringProperty,
       accessibleHelpText: a11y.timeSliderHelpStringProperty,
     });
-    for (let tick = TIME_RANGE.min; tick <= TIME_RANGE.max; tick += MINOR_TICK_MYR) {
+    for (let tick = DEEP_TIME_RANGE.min; tick <= DEEP_TIME_RANGE.max; tick += MINOR_TICK_MYR) {
       if (tick % MAJOR_TICK_MYR === 0) {
         slider.addMajorTick(tick);
       } else {
@@ -113,21 +107,21 @@ export class TimeControlPanel extends PlateTectonicsPanel {
       align: "center",
       spacing: 7,
       children: [
-        new Text(timeStrings.titleStringProperty, {
+        new Text(deepTime.titleStringProperty, {
           font: TITLE_FONT,
           fill: PlateTectonicsColors.textColorProperty,
         }),
         new Text(readoutProperty, { font: READOUT_FONT, fill: PlateTectonicsColors.accentColorProperty }),
         slider,
         timeControlNode,
-        new Text(timeStrings.rateStringProperty, {
+        new Text(deepTime.rateStringProperty, {
           font: NOTE_FONT,
           fill: PlateTectonicsColors.secondaryTextColorProperty,
         }),
       ],
     });
 
-    const options = optionize<TimeControlPanelOptions, EmptySelfOptions, PlateTectonicsPanelOptions>()(
+    const options = optionize<DeepTimeClockPanelOptions, EmptySelfOptions, PlateTectonicsPanelOptions>()(
       { minWidth: CONTROL_PANEL_WIDTH },
       providedOptions,
     );

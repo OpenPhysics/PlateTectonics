@@ -36,6 +36,7 @@ import { VOLCANOES } from "../../common/data/generated/volcanoData.js";
 import { HOTSPOTS } from "../../common/data/hotspots.js";
 import type { EarthProjection } from "../../common/EarthProjection.js";
 import { PlateReconstruction } from "../../common/PlateReconstruction.js";
+import type { RingMode } from "../../common/view/GlobeFeaturePainter.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import {
   BOUNDARY_LINE_WIDTH,
@@ -46,59 +47,33 @@ import {
   QUAKE_RADIUS_PER_MAGNITUDE,
   VOLCANO_MARKER_SIZE,
 } from "../../PlateTectonicsConstants.js";
+import type { EarthModel } from "../model/EarthModel.js";
 import { type DepthBand, depthBand, passesDepthFilter } from "../model/EarthquakeDepthFilter.js";
-import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
 
 /** Smallest magnitude in the catalogue, used as the zero point of the marker size ramp. */
 const MIN_CATALOGUE_MAGNITUDE = Math.min(...EARTHQUAKES.magnitude);
 
-/** How a traced feature will be used, which decides how (and whether) it is closed. */
-export type RingMode = "fill" | "stroke" | "open";
+/**
+ * Re-exported so the two canvas subclasses can keep importing them from here. Both
+ * really belong to feature *tracing*, which this screen's globe and the Deep Time
+ * screen share — see `GlobeFeaturePainter`.
+ */
+export { isSeamSegment, type RingMode } from "../../common/view/GlobeFeaturePainter.js";
 
 /** Depth bands in draw order: deep first, so the shallow crowd along the trenches stays on top. */
 const DEPTH_BANDS: readonly DepthBand[] = ["deep", "intermediate", "shallow"];
 
-/**
- * How close to ±180° of longitude, or to a pole, a vertex has to be for its segment to
- * count as a dataset seam. The seams sit on those lines exactly, so this only has to
- * absorb the last digit of the stored coordinate — see {@link isSeamSegment}.
- */
-const SEAM_TOLERANCE_DEGREES = 1e-6;
-
-/**
- * Whether a source segment is a seam cut into the dataset to make it fit a rectangle,
- * rather than a real edge of the feature.
- *
- * A plate that straddles the antimeridian is stored as a polygon slit open along
- * ±180°, and one that reaches a pole is closed off along the pole itself — fourteen
- * such segments in `PLATES`, plus two along the poles. They are not edges of anything,
- * so they are never *stroked*: on the globe they would draw as bright lines up the
- * middle of the Pacific and across the Arctic, and on the flat map they do the same as
- * soon as the map is panned off centre and ±180° stops being the edge of the viewport.
- * They are still *filled*, because the polygon needs them to close.
- *
- * Judged on the source coordinates, because a seam is a property of how the dataset
- * was cut, not of where the reconstruction has since carried it.
- */
-export function isSeamSegment(lonA: number, latA: number, lonB: number, latB: number): boolean {
-  const onAntimeridian =
-    Math.abs(Math.abs(lonA) - 180) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(lonB) - 180) < SEAM_TOLERANCE_DEGREES;
-  const alongPole =
-    Math.abs(Math.abs(latA) - 90) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(latB) - 90) < SEAM_TOLERANCE_DEGREES;
-  return onAntimeridian || alongPole;
-}
-
 export type EarthCanvasNodeOptions = CanvasNodeOptions;
 
 export abstract class EarthCanvasNode extends CanvasNode {
-  protected readonly model: PlateTectonicsModel;
+  protected readonly model: EarthModel;
   protected readonly projection: EarthProjection;
   protected readonly reconstruction = new PlateReconstruction();
 
   /** The shaded relief raster, once it has finished decoding. */
   protected reliefImage: HTMLImageElement | null = null;
 
-  protected constructor(model: PlateTectonicsModel, projection: EarthProjection, options?: EarthCanvasNodeOptions) {
+  protected constructor(model: EarthModel, projection: EarthProjection, options?: EarthCanvasNodeOptions) {
     super({ canvasBounds: projection.viewBounds, ...options });
     this.model = model;
     this.projection = projection;

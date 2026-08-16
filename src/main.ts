@@ -22,10 +22,11 @@ import "./brand.js";
 import { onReadyToLaunch, PreferencesModel, Sim } from "scenerystack/sim";
 import { Tandem } from "scenerystack/tandem";
 import { CrustScreen } from "./crust/CrustScreen.js";
+import { DeepTimeScreen } from "./deep-time/DeepTimeScreen.js";
+import { EarthScreen } from "./earth/EarthScreen.js";
 import { StringManager } from "./i18n/StringManager.js";
 import PlateTectonicsColors from "./PlateTectonicsColors.js";
 import { PlateMotionScreen } from "./plate-motion/PlateMotionScreen.js";
-import { PlateTectonicsScreen } from "./plate-tectonics/PlateTectonicsScreen.js";
 import { PlateTectonicsPreferencesModel } from "./preferences/PlateTectonicsPreferencesModel.js";
 import { PlateTectonicsPreferencesNode } from "./preferences/PlateTectonicsPreferencesNode.js";
 
@@ -36,9 +37,9 @@ onReadyToLaunch(() => {
   const simPreferences = new PlateTectonicsPreferencesModel(Tandem.ROOT.createTandem("preferences"));
 
   const screens = [
-    new PlateTectonicsScreen(simPreferences, {
-      name: stringManager.getScreenNames().plateTectonicsStringProperty,
-      tandem: Tandem.ROOT.createTandem("plateTectonicsScreen"),
+    new EarthScreen(simPreferences, {
+      name: stringManager.getScreenNames().earthStringProperty,
+      tandem: Tandem.ROOT.createTandem("earthScreen"),
       backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,
     }),
     new CrustScreen(simPreferences, {
@@ -49,6 +50,11 @@ onReadyToLaunch(() => {
     new PlateMotionScreen(simPreferences, {
       name: stringManager.getScreenNames().plateMotionStringProperty,
       tandem: Tandem.ROOT.createTandem("plateMotionScreen"),
+      backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,
+    }),
+    new DeepTimeScreen({
+      name: stringManager.getScreenNames().deepTimeStringProperty,
+      tandem: Tandem.ROOT.createTandem("deepTimeScreen"),
       backgroundColorProperty: PlateTectonicsColors.backgroundColorProperty,
     }),
   ];
@@ -85,7 +91,8 @@ onReadyToLaunch(() => {
       thanks:
         "Plate model: Bird (2003), doi:10.1029/2001GC000252, via fraxen/tectonicplates (ODC-BY 1.0). " +
         "Coastlines: Natural Earth. Earthquakes: USGS ANSS. Volcanoes: NOAA NCEI / Smithsonian GVP. " +
-        "Elevation and bathymetry: NOAA NCEI.",
+        "Elevation and bathymetry: NOAA NCEI. " +
+        "Deep-time reconstruction: Müller et al. (2019), doi:10.1029/2018TC005462, EarthByte (CC BY 4.0).",
     },
   });
 

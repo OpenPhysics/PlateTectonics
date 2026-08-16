@@ -5,7 +5,7 @@
  * and by how much the block stretches its elevations.
  *
  * ── Why this is model state ───────────────────────────────────────────────────
- * The same reasoning as `showGlobeProperty` on the Plate Tectonics screen: a *camera* is
+ * The same reasoning as `showGlobeProperty` on the Earth screen: a *camera* is
  * a view concern and lives in the view, but the choice between two ways of presenting
  * the subject is a choice about what is shown, it is described in the screen summary, it
  * has to survive Reset All, and both the picture and its labels depend on it. The camera

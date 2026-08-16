@@ -172,6 +172,16 @@ export const TIME_STEP_MYR = 0.5;
  */
 export const PRESENT_DAY_TOLERANCE_MYR = 0.05;
 
+/**
+ * The Deep Time screen's clock, which covers 250 Myr rather than 50 and so has to run
+ * a great deal faster to be watchable. Ten million years per second walks the whole
+ * reconstruction in about twenty-five seconds; the step button moves one snapshot's
+ * worth (see `HISTORY_STEP_MYR`), because a smaller step would leave the plates and
+ * boundaries on the same snapshot and look like nothing had happened.
+ */
+export const DEEP_TIME_MYR_PER_SECOND = 10;
+export const DEEP_TIME_STEP_MYR = 5;
+
 // ── Isostasy and the crust (Crust screen) ─────────────────────────────────────
 // Lengths here are in metres rather than km, because the Crust screen works at the
 // scale of a single crustal column and its slider spans 4–70 km.
@@ -474,6 +484,8 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   FAST_SPEED_MULTIPLIER,
   TIME_STEP_MYR,
   PRESENT_DAY_TOLERANCE_MYR,
+  DEEP_TIME_MYR_PER_SECOND,
+  DEEP_TIME_STEP_MYR,
   MANTLE_DENSITY_KG_M3,
   SEAWATER_DENSITY_KG_M3,
   AIRY_REFERENCE_OFFSET_M,

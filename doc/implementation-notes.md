@@ -20,21 +20,18 @@ src/
       dataTypes.ts               shapes of every dataset (hand-written)
       hotspots.ts                hand-maintained hotspot list
       generated/                 npm run build-data writes these — do not edit
-  plate-tectonics/
+  earth/
     model/
-      PlateTectonicsModel.ts     all AXON state
+      EarthModel.ts     all AXON state
       EarthquakeDepthFilter.ts   depth bands and the filter predicate
     view/
-      PlateTectonicsScreenView.ts  layout, view switching, relief loading, pdomOrder
+      EarthScreenView.ts  layout, view switching, relief loading, pdomOrder
       EarthCanvasNode.ts           the layers both global views share (canvas)
       MapCanvasNode.ts             the flat global map
       GlobeCanvasNode.ts           the 3-D globe
       PlateOverlayNode.ts          plate labels and motion arrows (Scenery nodes)
-      CrossSectionNode.ts          a section: canvas + localized annotations
-      CrossSectionCanvasNode.ts    the painted section
-      CrossSectionGeometry.ts      profile → view coordinates, slab fitting
       LayerControlPanel.ts         layer checkboxes + depth filter
-      ViewControlPanel.ts          view combo box
+      ViewControlPanel.ts          the globe / flat-map switch
       TimeControlPanel.ts          time slider, play/pause, speed
       MapLegendNode.ts             legend strip + data credit
       LegendSwatches.ts            the symbols, shared by legend and checkboxes
@@ -55,8 +52,8 @@ depends on changes: a layer toggle, the depth filter, the reconstruction time, o
 colour-profile switch.
 
 Things that are few and need crisp text stay ordinary Scenery nodes: the sixteen plate
-labels and motion arrows (`PlateOverlayNode`), and every cross-section annotation
-(`CrossSectionNode`) — which also keeps them localized and reachable.
+labels and motion arrows (`PlateOverlayNode`) — which also keeps them localized and
+reachable.
 
 `PlateReconstruction.transform` writes its result into public scratch fields rather
 than returning an object, because it is called tens of thousands of times per frame
@@ -118,7 +115,7 @@ was fixed:
   used; it moved to `EarthCanvasNode` when the second caller appeared. Without it the
   Pacific gets a bright line straight up the middle of it.
 
-Reset All puts both cameras back, through `PlateTectonicsScreenView.reset` — a camera
+Reset All puts both cameras back, through `EarthScreenView.reset` — a camera
 is a way of looking at the Earth rather than a fact about it, so neither belongs in the
 model. `showGlobeProperty` does, because it is a choice about what is shown.
 
@@ -192,23 +189,66 @@ Notable pieces:
   colour ramp plus a north-west illumination, and a light ice mask over high polar
   ground so Greenland and Antarctica read as ice rather than as mountains.
 
+- `scripts/data/gplates.ts` + `scripts/data/gplates/resolve.py` resolve the deep-time
+  plate model. This is the one step that shells out to Python, and it earns the
+  exception: a GPlates rotation file is a *hierarchy* of relative rotations whose shape
+  changes with time, and a plate polygon at 100 Ma is rebuilt from whichever moving
+  boundary features bounded it then. pyGPlates is the reference implementation of both,
+  and reimplementing it in TypeScript to save a build-time dependency would be trading
+  a correct answer for a fashionable one. The step creates its own virtualenv under
+  `.cache/gplates/`, caches the resolved JSON keyed by span and step, and is not needed
+  by `npm run build`, `npm test`, or the shipped sim.
+
 Generated files are excluded from Biome (see `biome.json`) and formatted by
 `scripts/data/emit.ts` instead, which keeps the numeric arrays compact.
 
+## Two reconstructions, one painter
+
+The sim reconstructs plate positions in two quite different ways, and the rendering
+path is shared rather than duplicated between them.
+
+`PlateReconstruction` (Earth screen) spins each plate about a fixed Euler pole at a
+constant rate. `DeepTimeReconstruction` (Deep Time screen) interpolates a published
+model's *sampled* finite rotations with a quaternion slerp. What they have in common is
+the shape of the answer: `transform(lon, lat, frame)` writing to scratch `lon`/`lat`
+fields, which is the `SurfaceTransform` interface in `GlobeFeaturePainter.ts`.
+
+That is what lets both screens share `GlobeFeaturePainter` — the sphere-on-a-disc work
+described above, which is by some distance the trickiest code in the sim and the last
+thing that should exist in two copies. The painter takes a `GlobeProjection` and a
+`SurfaceTransform` and knows nothing else about either screen.
+
+Two consequences worth knowing:
+
+- The Deep Time screen's *resolved* geometry — plate polygons, boundary lines — is
+  already at the instant being drawn and must not be rotated again. It still goes
+  through the painter, because subdividing long segments and cutting at the limb apply
+  to it just as much, so it is handed `IDENTITY_ROTATION_SLOT`: row 0 of the rotation
+  table, reserved at build time and guaranteed to be the identity at every sample.
+  There is a test on that, because if it ever stopped being the identity the plates
+  would slide off the continents they belong to.
+- The Deep Time plate wash is composited on an offscreen canvas and drawn once at
+  `PLATE_FILL_OPACITY`, rather than filled plate by plate. The model's topologies are
+  not a clean tiling — several plate IDs resolve to more than one polygon at the same
+  instant, flat slabs and sub-plates overlapping the plate they belong to — and filling
+  each straight onto the globe stacks the alpha in the overlaps, which came out as
+  near-black slivers.
+
 ## Accessibility
 
-- `PlateTectonicsScreenSummaryContent` derives its *current details* paragraph from the
-  model, so a screen-reader user hears which view is showing, which layers are drawn,
-  which depths pass the filter, and where in geological time the plates are.
+- `EarthScreenSummaryContent` derives its *current details* paragraph from the
+  model, so a screen-reader user hears whether the globe or the flat map is showing,
+  which layers are drawn, which depths pass the filter, and where in geological time
+  the plates are.
 - Every control carries an `accessibleName` (and a help text where it earns one) from
   the `a11y` string group.
-- `PlateTectonicsScreenView` sets an explicit `pdomOrder`: the global view and its zoom
-  buttons → view selector → layer checkboxes → depth filter → time slider → time
+- `EarthScreenView` sets an explicit `pdomOrder`: the global view and its zoom
+  buttons → view switch → layer checkboxes → depth filter → time slider → time
   controls → Reset All. The map and the globe are both in it; whichever is hidden drops
   out on its own.
 - The keyboard-help dialog has a section per interaction kind: slider, moving a
-  draggable item (which is how both the map and the globe are moved), combo box, and
-  basic actions.
+  draggable item (which is how both the map and the globe are moved), and basic
+  actions.
 
 ## Testing
 
@@ -217,8 +257,7 @@ Generated files are excluded from Biome (see `biome.json`) and formatted by
 | File | Covers |
 |---|---|
 | `PlateReconstruction.test.ts` | Euler-pole rotation, round trips, and plate speeds against published values |
-| `PlateTectonicsModel.test.ts` | layer state, depth bands, the time clock and reset |
-| `CrossSectionGeometry.test.ts` | the two-band layout, crust switching, slab fitting, ridge cooling |
+| `EarthModel.test.ts` | layer state, depth bands, the time clock and reset |
 | `MapProjection.test.ts` | projection round trips, the 2:1 viewport, motion-arrow bearings, the camera |
 | `GlobeProjection.test.ts` | orthographic projection and its inverse, visibility, bearings, the camera |
 | `geophysicalData.test.ts` | integrity of every generated dataset, plus a few facts about the Earth |
@@ -227,18 +266,6 @@ Generated files are excluded from Biome (see `biome.json`) and formatted by
 `geophysicalData.test.ts` is the guard on `npm run build-data`: it fails if a
 regeneration returns something mangled, and it checks that deep earthquakes still
 cluster around the Pacific, which no amount of reshaping should change.
-
-## Adding a cross-section
-
-1. Add an entry to `SECTIONS` in `scripts/build-data.ts` (profile end points, corridor
-   half-width, depth range, minimum magnitude).
-2. Extend `ViewKey` in `src/common/data/dataTypes.ts`.
-3. Add the view name and its a11y description to every locale JSON, and an item to
-   `ViewControlPanel`.
-4. Run `npm run build-data`.
-
-The section renders itself from there: the surface comes from the DEM, the seismicity
-from USGS, and the slab from the seismicity.
 
 ## Three screens and what they share
 
@@ -264,20 +291,13 @@ src/
             CanvasArrows.ts            arrow-heads and flow lines
   crust/          the Crust screen
   plate-motion/   the Plate Motion screen
-  plate-tectonics/ the global map
+  earth/ the globe and the flat map
 ```
 
 The three screens share the material colour ramps, the probe, the ruler, the colour-mode
-panel and the vertical scale; the two schematic ones also share the 3-D block. They deliberately do **not** share a cross-section painter: the
-global screen's `CrossSectionCanvasNode` is built from a `CrossSectionData` record and
-fits its slab to real hypocentres, none of which the other two have. Making it
-screen-agnostic would have meant inventing an interface satisfied by three unrelated
-models, for the benefit of one painter.
-
-`CrossSectionScale` is a clean reimplementation of the two-band idea in
-`CrossSectionGeometry`, not a generalisation of it. Both magnify a shallow band against
-a compressed deep one; only the new one carries a zoom level, and only the old one knows
-about DEM profiles.
+panel and the vertical scale; the two schematic ones also share the 3-D block. The
+global screen shares none of the section machinery, because it draws no section: it is
+a map, and everything on it is a published dataset rather than a computed shape.
 
 ### Painting order on Plate Motion
 

@@ -41,7 +41,7 @@ the map show, and it is why the Nazca arrow is long and the Antarctic arrow is a
 | Earthquakes | USGS ANSS ComCat, M ≥ 5.8 since 1990 | ~8 800 events with depth and magnitude |
 | Volcanoes | NOAA NCEI Holocene volcano list (Smithsonian GVP holdings) | ~1 600 volcanoes |
 | Hotspots | Hand-maintained list of the plumes named in introductory texts | `src/common/data/hotspots.ts` |
-| Topography and bathymetry | NOAA NCEI global DEM mosaic | rendered to a shaded relief raster, and sampled along each cross-section |
+| Topography and bathymetry | NOAA NCEI global DEM mosaic | rendered to a shaded relief raster |
 | Age of the ocean floor | EarthByte / Seton et al. (2020) present-day age grid, doi:10.1029/2020GC009214 | contoured into isochrons at 10, 20, 40 … 180 Ma |
 
 ### From PB2002's poles to absolute plate motion
@@ -143,49 +143,14 @@ kind of boundary, while intermediate and deep events happen almost only inside a
 subducting slab. Filtering to *deep* on the global map therefore draws a map of the
 world's subduction zones and nothing else — which is the point of the control.
 
-## Cross-sections
-
-Three profiles, one per boundary type:
-
-| View | Profile | Depth shown |
-|---|---|---|
-| Subduction zone | 74.5° W → 60.5° W at 21.5° S, across the Chile trench | 700 km |
-| Spreading ridge | 50° W → 40° W at 24° N, across the Mid-Atlantic Ridge | 60 km |
-| Transform fault | across the San Andreas fault at Parkfield, perpendicular to its N40° W strike | 40 km |
-
-For each one the build script samples the DEM along the profile, then projects every
-earthquake and volcano within a corridor either side of it (200 km, 120 km and 40 km
-respectively) onto the profile line. The surface is real and the seismicity is real:
-2 839 earthquakes in the Chile section alone.
-
-**The slab is fitted to the earthquakes.** `CrossSectionGeometry` bins the hypocentres
-by depth and takes the median distance along the profile in each bin. That polyline
-*is* the Wadati–Benioff zone, and it is what the drawn slab follows, so the picture and
-the data cannot disagree.
-
-Two things in a cross-section are schematic rather than measured: the crust /
-lithosphere / asthenosphere thicknesses (textbook averages, with the crust thickened
-under high ground and thinned under ocean according to the real elevation), and the
-mantle-flow arrows. In the ridge section the plate thickness follows the half-space
-cooling law, `thickness ≈ 9.5 √age`, with age taken from distance ÷ half-spreading
-rate — which is why the plate is thin at the axis and thickens away from it.
-
-### Two vertical scales
-
-Surface relief and slab depth differ by two orders of magnitude: the Andes rise 6 km
-while the slab beneath them reaches 600 km. A single vertical scale makes one of them
-invisible, so a cross-section is drawn in two bands — relief on top with its own
-scale, depth below — and the view states the exaggeration factor on screen rather than
-distorting the picture silently.
-
 ## Three things worth doing with the sim
 
 1. **The Ring of Fire.** Switch on earthquakes and volcanoes and look at the Pacific.
    Both cluster on the same lines, and those lines are the convergent boundaries: the
    correlation is the evidence that subduction causes both.
-2. **Wadati–Benioff zones.** Set the depth filter to *deep* on the global map: almost
-   every remaining dot is around the Pacific and Sunda. Then open the Chile section
-   and watch the events step down along the slab from the trench to 600 km.
+2. **Wadati–Benioff zones.** Set the depth filter to *deep*: almost every remaining
+   dot is around the Pacific and Sunda, tracing the slabs that descend there. Turn the
+   globe so the Pacific faces you and the scatter resolves into a ring.
 3. **Seafloor spreading.** Switch on boundaries and topography, and follow the ridges:
    a continuous mountain range down the middle of the Atlantic, marked by shallow
    earthquakes and no deep ones at all. Then add **Seafloor age** and turn the other
@@ -230,6 +195,64 @@ distorting the picture silently.
 - **Hotspots do not move.** That is deliberate, and it is the physics: a plume is
   anchored in the deep mantle while the plate slides over it, which is why the Hawaiian
   chain gets older to the north-west.
+
+Most of these are limits of *extrapolating today's velocities*, not limits of plate
+tectonics. The Deep Time screen replaces that extrapolation with a published
+reconstruction and is bound by a different set of limits — see below.
+
+## The Deep Time screen
+
+The Earth screen answers "where were the plates?" by spinning today's velocities
+backwards. This screen answers it by replaying a model that was fitted to the
+geological record: **Müller et al. (2019)**, *A Global Plate Model Including
+Lithospheric Deformation Along Major Rifts and Orogens Since the Triassic*, Tectonics
+38(6), 1884–1907, [doi:10.1029/2018TC005462](https://doi.org/10.1029/2018TC005462),
+distributed by EarthByte under CC BY 4.0. It covers 0–250 Ma, which reaches Pangaea.
+
+The model is resolved at build time with pyGPlates (`npm run build-data plate-history`)
+into 51 instants, one every 5 Myr. Nothing about GPlates ships in the sim: the output is
+two committed modules, like every other dataset here.
+
+### Why the data comes in two different shapes
+
+This is the one thing worth understanding about the screen, because it is visible on
+it.
+
+A **coastline** is a static feature. It has present-day geometry, and it was cookie-cut
+by plate ID, so reconstructing it is one rigid rotation of that geometry. It therefore
+needs no per-instant storage at all — a table of finite rotations per plate ID is
+enough, and the runtime interpolates between samples, so **the continents glide**.
+
+A **plate polygon** is not a static feature. It has no present-day geometry to rotate:
+it is *resolved* at each instant from whichever moving boundary features bounded it
+then. Plates are also born and destroyed — 52 today, 17 at 180 Ma, 11 at 250 Ma, as the
+ocean floor that carried the rest had not been made yet. That genuinely has to be baked
+per instant, so **the plates and boundaries step**, 5 Myr at a time.
+
+The rotations are interpolated as rotations — quaternion slerp, taking the short way
+round — and not by blending pole latitude, pole longitude and angle, which gives
+visibly wrong paths worst exactly where a plate is moving fastest.
+
+### What this screen does not claim
+
+- **The stepping is real, and it is 5 Myr.** A ridge appears between one instant and
+  the next rather than growing. Making it finer is a straight trade against the size of
+  the generated module, which is already the largest thing the sim ships.
+- **Only the reconstruction is drawn.** No earthquakes, volcanoes or relief: those are
+  present-day observations and mean nothing at 200 Ma. The Earth screen is where they
+  belong.
+- **The plate mosaic has holes, and they are honest.** The rigid plates do not tile the
+  globe; the gaps are the *deforming belts* — orogens and rifts where the model
+  explicitly does not treat the lithosphere as rigid. They are a separate layer, off by
+  default, and switching them on fills the gaps in. This is precisely the thing the
+  Earth screen says it cannot show.
+- **The past only.** No published reconstruction runs forwards, so the slider stops at
+  the present day. Running plate motion into the future is the Earth screen's job, and
+  it is honest about how far.
+- **Deep time is less certain than recent time.** Rotations before about 200 Ma rest on
+  palaeomagnetism and geology rather than on seafloor magnetic anomalies, because the
+  ocean floor that recorded them has been subducted. The reconstruction is a published
+  best estimate, not a measurement.
 
 ## The Crust screen
 

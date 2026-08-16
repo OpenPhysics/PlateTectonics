@@ -2,8 +2,7 @@
  * scripts/data/geo.ts
  *
  * Geographic helpers shared by the data-generation scripts: polyline
- * simplification, point-in-polygon tests, great-circle math, and the
- * profile projection used to build cross-section data.
+ * simplification, point-in-polygon tests and great-circle math.
  *
  * Angles are degrees, distances kilometres, unless a name says otherwise.
  */
@@ -161,61 +160,67 @@ export function greatCircleDistanceKm(a: LonLat, b: LonLat): number {
   return angle * EARTH_RADIUS_KM;
 }
 
+/** Angular distance from `p` to the great circle through `a` and `b`, in degrees. */
+function greatCircleDeviation(
+  p: readonly [number, number, number],
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+): number {
+  const normal = cross(a, b);
+  const length = Math.hypot(...normal);
+  if (length === 0) {
+    // Coincident endpoints: fall back to the distance from the point they share.
+    return Math.atan2(Math.hypot(...cross(p, a)), dot(p, a)) * RAD_TO_DEG;
+  }
+  return Math.asin(Math.min(1, Math.abs(dot(p, normal)) / length)) * RAD_TO_DEG;
+}
+
 /**
- * A great-circle profile between two points, used to build cross-sections.
- * Projects any nearby point onto the profile, giving distance along the profile
- * and signed perpendicular offset.
+ * Ramer–Douglas–Peucker simplification done on the sphere, with `tolerance` an
+ * angular distance in degrees.
+ *
+ * {@link simplify} measures deviation in the lon/lat plane, which is the right answer
+ * for data already cut to fit a rectangle. Reconstructed geometry is not: a plate at
+ * 100 Ma sits wherever the rotation put it, so its outline crosses ±180° without a
+ * seam and runs close to the poles, and both wreck a planar measurement — a segment
+ * stepping from 179° to −179° reads as a 358° jump. Measuring the deviation as an
+ * angle off the great circle through the endpoints has neither problem.
  */
-export class Profile {
-  private readonly start: [number, number, number];
-  private readonly normal: [number, number, number];
-  /** Unit vector in the profile plane, perpendicular to `start` (the "along" direction). */
-  private readonly along: [number, number, number];
-  public readonly lengthKm: number;
-  public readonly startLonLat: LonLat;
-  public readonly endLonLat: LonLat;
+export function simplifyGreatCircle(points: readonly LonLat[], tolerance: number): LonLat[] {
+  if (points.length <= 2) {
+    return [...points];
+  }
+  const vectors = points.map(([lon, lat]) => toUnitVector(lon, lat));
 
-  public constructor(startLonLat: LonLat, endLonLat: LonLat) {
-    this.startLonLat = startLonLat;
-    this.endLonLat = endLonLat;
-    this.start = toUnitVector(startLonLat[0], startLonLat[1]);
-    const end = toUnitVector(endLonLat[0], endLonLat[1]);
-    const normal = cross(this.start, end);
-    const normalLength = Math.hypot(...normal);
-    if (normalLength === 0) {
-      throw new Error("Profile endpoints must not be coincident or antipodal");
+  // Iterative rather than recursive: a reconstructed ring can carry thousands of
+  // vertices, and the recursive form overflows the stack on the pathological cases.
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const pending: [number, number][] = [[0, points.length - 1]];
+
+  while (pending.length > 0) {
+    const [first, last] = pending.pop() as [number, number];
+    if (last <= first + 1) {
+      continue;
     }
-    this.normal = [normal[0] / normalLength, normal[1] / normalLength, normal[2] / normalLength];
-    this.along = cross(this.normal, this.start);
-    this.lengthKm = greatCircleDistanceKm(startLonLat, endLonLat);
+    const a = vectors[first] as [number, number, number];
+    const b = vectors[last] as [number, number, number];
+
+    let worst = 0;
+    let worstIndex = -1;
+    for (let i = first + 1; i < last; i++) {
+      const deviation = greatCircleDeviation(vectors[i] as [number, number, number], a, b);
+      if (deviation > worst) {
+        worst = deviation;
+        worstIndex = i;
+      }
+    }
+    if (worst > tolerance && worstIndex > 0) {
+      keep[worstIndex] = 1;
+      pending.push([first, worstIndex], [worstIndex, last]);
+    }
   }
 
-  /** Point at `distanceKm` along the profile from its start. */
-  public pointAt(distanceKm: number): LonLat {
-    const angle = distanceKm / EARTH_RADIUS_KM;
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
-    return toLonLat([
-      this.start[0] * c + this.along[0] * s,
-      this.start[1] * c + this.along[1] * s,
-      this.start[2] * c + this.along[2] * s,
-    ]);
-  }
-
-  /**
-   * Projects a geographic point onto the profile.
-   *
-   * @returns `distanceKm` measured from the profile start (may be negative or
-   * beyond the end) and `offsetKm`, the signed perpendicular distance from the
-   * profile's great circle.
-   */
-  public project(lon: number, lat: number): { distanceKm: number; offsetKm: number } {
-    const v = toUnitVector(lon, lat);
-    const offsetAngle = Math.asin(Math.max(-1, Math.min(1, dot(v, this.normal))));
-    const distanceAngle = Math.atan2(dot(v, this.along), dot(v, this.start));
-    return {
-      distanceKm: distanceAngle * EARTH_RADIUS_KM,
-      offsetKm: offsetAngle * EARTH_RADIUS_KM,
-    };
-  }
+  return points.filter((_, index) => keep[index] === 1);
 }

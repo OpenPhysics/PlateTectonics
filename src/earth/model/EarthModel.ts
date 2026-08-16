@@ -1,5 +1,5 @@
 /**
- * PlateTectonicsModel.ts
+ * EarthModel.ts
  *
  * All simulation state, as AXON Properties the view observes.
  *
@@ -12,8 +12,7 @@
  * ── State groups ──────────────────────────────────────────────────────────────
  *  - Layer visibility: which overlays are drawn.
  *  - Earthquake depth filter: which hypocentres are drawn.
- *  - View selection: the global map — flat or as a 3-D globe — or one of the three
- *    boundary cross-sections.
+ *  - View selection: the Earth drawn as a 3-D globe or as a flat map.
  *  - Time: the reconstruction clock, plus play/pause and speed.
  */
 
@@ -22,7 +21,6 @@ import { BooleanProperty, DerivedProperty, EnumerationProperty, NumberProperty, 
 import { Range } from "scenerystack/dot";
 import type { TModel } from "scenerystack/joist";
 import { TimeSpeed } from "scenerystack/scenery-phet";
-import type { ViewKey } from "../../common/data/dataTypes.js";
 import { TimeModel } from "../../common/TimeModel.js";
 import {
   FAST_SPEED_MULTIPLIER,
@@ -37,7 +35,7 @@ import type { EarthquakeDepthFilter } from "./EarthquakeDepthFilter.js";
 /** Range of the reconstruction clock, in millions of years from the present. */
 export const TIME_RANGE = new Range(-TIME_RANGE_MYR, TIME_RANGE_MYR);
 
-export class PlateTectonicsModel implements TModel {
+export class EarthModel implements TModel {
   // ── Layer visibility ────────────────────────────────────────────────────────
   //
   // Every layer starts off. The sim opens on a bare ocean-and-coastline map, and the
@@ -78,26 +76,18 @@ export class PlateTectonicsModel implements TModel {
 
   // ── View selection ──────────────────────────────────────────────────────────
 
-  /** The global map, or one of the boundary cross-sections. */
-  public readonly selectedViewProperty = new Property<ViewKey>("global");
-
   /**
-   * Whether the global view draws the Earth as a rotatable 3-D globe rather than as
-   * the flat equirectangular map. The flat map shows the whole world at once and is
-   * the better place to compare one ocean with another; the globe shows shapes and
+   * Whether the Earth is drawn as a rotatable 3-D globe rather than as the flat
+   * equirectangular map. The globe is the default because it shows shapes and
    * distances honestly, which is what makes a circum-Pacific belt of earthquakes look
-   * like a ring rather than a horseshoe smeared across two edges of a rectangle.
+   * like a ring rather than a horseshoe smeared across two edges of a rectangle; the
+   * flat map shows the whole world at once and is the better place to compare one
+   * ocean with another.
    */
-  public readonly showGlobeProperty = new BooleanProperty(false);
+  public readonly showGlobeProperty = new BooleanProperty(true);
 
-  /** True while a cross-section is on screen rather than the global map. */
-  public readonly isCrossSectionProperty: TReadOnlyProperty<boolean>;
-
-  /** True while the flat map is on screen. */
+  /** True while the flat map is on screen — the complement of {@link showGlobeProperty}. */
   public readonly isFlatMapProperty: TReadOnlyProperty<boolean>;
-
-  /** True while the 3-D globe is on screen. */
-  public readonly isGlobeProperty: TReadOnlyProperty<boolean>;
 
   // ── Time ────────────────────────────────────────────────────────────────────
 
@@ -107,7 +97,7 @@ export class PlateTectonicsModel implements TModel {
    */
   public readonly timeMillionsOfYearsProperty = new NumberProperty(0, { range: TIME_RANGE });
 
-  /** Play/pause plus the elapsed wall-clock time that drives cross-section animation. */
+  /** Play/pause for the reconstruction clock, plus the elapsed wall-clock time. */
   public readonly timer = new TimeModel();
 
   /** Slow / normal / fast, applied to {@link MYR_PER_SECOND}. */
@@ -117,18 +107,7 @@ export class PlateTectonicsModel implements TModel {
   public readonly isPresentDayProperty: TReadOnlyProperty<boolean>;
 
   public constructor() {
-    this.isCrossSectionProperty = new DerivedProperty(
-      [this.selectedViewProperty],
-      (view: ViewKey) => view !== "global",
-    );
-    this.isGlobeProperty = new DerivedProperty(
-      [this.selectedViewProperty, this.showGlobeProperty],
-      (view: ViewKey, showGlobe: boolean) => view === "global" && showGlobe,
-    );
-    this.isFlatMapProperty = new DerivedProperty(
-      [this.selectedViewProperty, this.showGlobeProperty],
-      (view: ViewKey, showGlobe: boolean) => view === "global" && !showGlobe,
-    );
+    this.isFlatMapProperty = new DerivedProperty([this.showGlobeProperty], (showGlobe: boolean) => !showGlobe);
     this.isPresentDayProperty = new DerivedProperty(
       [this.timeMillionsOfYearsProperty],
       (time: number) => Math.abs(time) <= PRESENT_DAY_TOLERANCE_MYR,
@@ -191,7 +170,6 @@ export class PlateTectonicsModel implements TModel {
     this.showTopographyProperty.reset();
     this.showSeafloorAgeProperty.reset();
     this.earthquakeDepthFilterProperty.reset();
-    this.selectedViewProperty.reset();
     this.timeSpeedProperty.reset();
     this.resetTime();
   }

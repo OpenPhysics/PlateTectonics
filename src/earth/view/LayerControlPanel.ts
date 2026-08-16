@@ -20,8 +20,8 @@ import { PlateTectonicsPanel, type PlateTectonicsPanelOptions } from "../../comm
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import { CONTROL_PANEL_WIDTH } from "../../PlateTectonicsConstants.js";
+import type { EarthModel } from "../model/EarthModel.js";
 import type { EarthquakeDepthFilter } from "../model/EarthquakeDepthFilter.js";
-import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
 import { createLegendSwatch } from "./LegendSwatches.js";
 
 const LABEL_FONT = new PhetFont(13);
@@ -33,11 +33,11 @@ export class LayerControlPanel extends PlateTectonicsPanel {
   /** The interactive children, in the order the user should reach them. */
   public readonly focusOrder: Node[];
 
-  public constructor(model: PlateTectonicsModel, providedOptions?: LayerControlPanelOptions) {
+  public constructor(model: EarthModel, providedOptions?: LayerControlPanelOptions) {
     const strings = StringManager.getInstance();
     const layerStrings = strings.getLayerStrings();
     const depthStrings = strings.getDepthFilterStrings();
-    const a11y = strings.getPlateTectonicsA11yStrings().controls;
+    const a11y = strings.getEarthA11yStrings().controls;
 
     const checkboxes = [
       {

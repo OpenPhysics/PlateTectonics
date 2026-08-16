@@ -1,9 +1,10 @@
 {
   "title": "Tectónica de Placas",
   "screens": {
-    "plateTectonics": "Tectónica de Placas",
+    "earth": "Tierra",
     "crust": "Corteza",
-    "plateMotion": "Movimiento de placas"
+    "plateMotion": "Movimiento de placas",
+    "deepTime": "Tiempo profundo"
   },
   "crust": {
     "myCrust": "Mi corteza",
@@ -72,13 +73,23 @@
     "arc": "Arco volcánico",
     "mountains": "Cordillera"
   },
+  "deepTime": {
+    "title": "Tiempo profundo",
+    "present": "Actualidad",
+    "age": "hace {{value}} millones de años",
+    "layers": "Mostrar",
+    "coastlines": "Continentes",
+    "plates": "Placas",
+    "boundaries": "Límites de placas",
+    "deforming": "Zonas de deformación",
+    "model": "Reconstrucción: Müller et al. (2019)",
+    "rate": "1 segundo = 10 millones de años",
+    "snapshotNote": "Las placas y los límites avanzan cada 5 millones de años"
+  },
   "views": {
     "title": "Vista",
-    "global": "Mapa global",
-    "subduction": "Zona de subducción — Fosa de Chile",
-    "divergent": "Dorsal de expansión — Atlántico Medio",
-    "transform": "Falla transformante — San Andrés",
-    "globe": "Mostrar como globo 3D",
+    "flatMap": "Mapa plano",
+    "globe": "Globo 3D",
     "globeHint": "Arrastre el globo para girar la Tierra",
     "mapHint": "Arrastre el mapa para moverlo de este a oeste; acérquese para verlo en detalle"
   },
@@ -121,21 +132,10 @@
     "seafloorAge": "Edad del fondo 0–180 Ma"
   },
   "section": {
-    "trench": "Fosa",
-    "ridge": "Dorsal oceánica",
-    "fault": "Zona de falla",
-    "arc": "Arco volcánico",
     "oceanicCrust": "Corteza oceánica",
     "continentalCrust": "Corteza continental",
-    "lithosphere": "Litosfera",
-    "asthenosphere": "Astenosfera",
     "mantle": "Manto",
-    "wadatiBenioff": "Zona de Wadati–Benioff",
     "seaLevel": "Nivel del mar",
-    "depthAxis": "Profundidad (km)",
-    "distanceAxis": "Distancia a lo largo del perfil (km)",
-    "verticalExaggeration": "Relieve exagerado ×{{value}} verticalmente",
-    "relativeMotion": "{{value}} mm/año",
     "crust": "Corteza",
     "upperMantle": "Manto superior",
     "lowerMantle": "Manto inferior",
@@ -144,19 +144,16 @@
   },
   "dataSources": "Placas: Bird (2003) · Terremotos: USGS · Volcanes: NOAA/GVP · Relieve: NOAA · Edad del fondo: EarthByte",
   "a11y": {
-    "plateTectonics": {
+    "earth": {
       "screenSummary": {
-        "playArea": "El área de juego muestra un mapa de las placas tectónicas de la Tierra, o un corte transversal a través de un límite de placas. Encima se pueden dibujar capas de datos reales: límites de placas coloreados por tipo, flechas del movimiento de las placas, epicentros de terremotos, volcanes y puntos calientes, el relieve sombreado de la superficie terrestre y del fondo marino, e isócronas del fondo oceánico — líneas de igual edad de la corteza, paralelas a las dorsales y cada vez más antiguas al alejarse de ellas.",
-        "controlArea": "El área de control tiene un selector de vista, una casilla para cada capa de datos, un filtro de profundidad de terremotos, controles que hacen avanzar y retroceder el movimiento de las placas en el tiempo geológico, y un botón de Restablecer todo.",
+        "playArea": "El área de juego muestra las placas tectónicas de la Tierra, dibujadas sobre un globo que puede girarse o sobre un mapa plano. Encima se pueden dibujar capas de datos reales: límites de placas coloreados por tipo, flechas del movimiento de las placas, epicentros de terremotos, volcanes y puntos calientes, el relieve sombreado de la superficie terrestre y del fondo marino, e isócronas del fondo oceánico — líneas de igual edad de la corteza, paralelas a las dorsales y cada vez más antiguas al alejarse de ellas.",
+        "controlArea": "El área de control tiene un interruptor entre el globo y el mapa plano, una casilla para cada capa de datos, un filtro de profundidad de terremotos, controles que hacen avanzar y retroceder el movimiento de las placas en el tiempo geológico, y un botón de Restablecer todo.",
         "interactionHint": "Active un par de capas y busque dónde coinciden: terremotos y volcanes alrededor del Pacífico, o dorsales y terremotos superficiales en medio del Atlántico."
       },
       "currentDetails": "{{view}} {{layers}} {{depths}} {{time}}",
       "viewDetails": {
-        "global": "Se muestra el mapa global. Puede moverse hacia el este y el oeste, y ampliarse para observar de cerca una región.",
-        "globe": "La Tierra se muestra como un globo, que puede girarse para traer cualquier región al campo de visión.",
-        "subduction": "Se muestra un corte transversal de la fosa de Chile, donde la placa de Nazca subduce bajo América del Sur.",
-        "divergent": "Se muestra un corte transversal de la dorsal Mesoatlántica, donde América del Norte y África se separan.",
-        "transform": "Se muestra un corte transversal de la falla de San Andrés, donde las placas del Pacífico y Norteamericana se deslizan una junto a la otra."
+        "global": "Se muestra el mapa plano. Puede moverse hacia el este y el oeste, y ampliarse para observar de cerca una región.",
+        "globe": "La Tierra se muestra como un globo, que puede girarse para traer cualquier región al campo de visión."
       },
       "layersDetails": "Capas mostradas: {{layers}}.",
       "noLayers": "No se muestra ninguna capa de datos.",
@@ -172,10 +169,7 @@
         "future": "Las placas se muestran como estarían dentro de unos {{value}} millones de años."
       },
       "controls": {
-        "viewSelector": "Vista",
-        "viewSelectorHelp": "Elija el mapa global o un corte transversal de un tipo de límite de placas.",
-        "globeToggle": "Mostrar como globo 3D",
-        "globeToggleHelp": "Dibujar el mapa global sobre un globo que puede girarse, en lugar de un mapa rectangular plano.",
+        "viewSwitchHelp": "Dibujar la Tierra como un globo que puede girarse, o como un mapa rectangular plano.",
         "globe": "Globo",
         "globeHelp": "Arrastre el globo para girar la Tierra. Con el globo seleccionado, las flechas izquierda y derecha mueven la vista hacia el este y el oeste, y las flechas arriba y abajo la mueven hacia el norte y el sur.",
         "map": "Mapa",
@@ -268,6 +262,30 @@
         "showLabels": "Mostrar etiquetas",
         "probe": "Sonda",
         "probeHelp": "Mueve la sonda por el corte transversal para leer la temperatura y la densidad donde se encuentra."
+      }
+    },
+    "deepTime": {
+      "screenSummary": {
+        "playArea": "El área de juego muestra un globo con una reconstrucción publicada de las placas terrestres durante los últimos 250 millones de años. Los continentes se mueven de forma continua, mientras que las placas y sus límites se reconstruyen cada cinco millones de años, porque las placas mismas nacen y desaparecen al abrirse y cerrarse los océanos.",
+        "controlArea": "El área de control tiene una casilla por capa, un deslizador y controles de reproducción que recorren desde la actualidad hasta hace 250 millones de años, y un botón Reiniciar todo.",
+        "interactionHint": "Retroceda el reloj y observe cómo se cierra el Atlántico: hace 250 millones de años todos los continentes forman Pangea."
+      },
+      "currentDetails": "{{time}} {{layers}}",
+      "timeDetails": {
+        "present": "El globo muestra la Tierra tal como es hoy.",
+        "past": "El globo muestra la Tierra tal como era hace unos {{value}} millones de años."
+      },
+      "layersDetails": "Capas mostradas: {{layers}}.",
+      "noLayers": "No se muestra ninguna capa.",
+      "controls": {
+        "globe": "Globo reconstruido",
+        "globeHelp": "Arrastre el globo para girar la Tierra. Con el globo enfocado, las flechas izquierda y derecha mueven la vista al este y al oeste, y las flechas arriba y abajo al norte y al sur.",
+        "timeSlider": "Tiempo geológico",
+        "timeSliderHelp": "Mueva el deslizador para elegir una edad, desde la actualidad hasta hace 250 millones de años.",
+        "coastlines": "Mostrar los continentes, transportados por las placas sobre las que se asientan.",
+        "plates": "Mostrar las placas tectónicas que existían en esa edad.",
+        "boundaries": "Mostrar los límites de placas, coloreados por tipo.",
+        "deforming": "Mostrar las zonas donde el modelo trata la litosfera como deformable en vez de rígida."
       }
     },
     "blockView": {

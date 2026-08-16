@@ -26,7 +26,7 @@ import type { EarthProjection } from "../../common/EarthProjection.js";
 import { PlateReconstruction } from "../../common/PlateReconstruction.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import { VELOCITY_VECTOR_SCALE } from "../../PlateTectonicsConstants.js";
-import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
+import type { EarthModel } from "../model/EarthModel.js";
 
 /** Speed (mm/year) the vector scale is defined against. */
 const REFERENCE_SPEED_MM_PER_YEAR = 100;
@@ -49,11 +49,7 @@ export class PlateOverlayNode extends Node {
   private readonly reconstruction = new PlateReconstruction();
   private readonly markers: PlateMarker[] = [];
 
-  public constructor(
-    model: PlateTectonicsModel,
-    projection: EarthProjection,
-    providedOptions?: PlateOverlayNodeOptions,
-  ) {
+  public constructor(model: EarthModel, projection: EarthProjection, providedOptions?: PlateOverlayNodeOptions) {
     const options = optionize<PlateOverlayNodeOptions, EmptySelfOptions, NodeOptions>()({}, providedOptions);
     super(options);
     this.projection = projection;

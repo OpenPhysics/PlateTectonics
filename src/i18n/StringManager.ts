@@ -77,20 +77,22 @@ export class StringManager {
    * Each property updates automatically when the locale changes.
    */
   public getScreenNames(): {
-    readonly plateTectonicsStringProperty: ReadOnlyProperty<string>;
+    readonly earthStringProperty: ReadOnlyProperty<string>;
     readonly crustStringProperty: ReadOnlyProperty<string>;
     readonly plateMotionStringProperty: ReadOnlyProperty<string>;
+    readonly deepTimeStringProperty: ReadOnlyProperty<string>;
   } {
     return {
-      plateTectonicsStringProperty: stringProperties.screens.plateTectonicsStringProperty,
+      earthStringProperty: stringProperties.screens.earthStringProperty,
       crustStringProperty: stringProperties.screens.crustStringProperty,
       plateMotionStringProperty: stringProperties.screens.plateMotionStringProperty,
+      deepTimeStringProperty: stringProperties.screens.deepTimeStringProperty,
     };
   }
 
-  /** Accessibility strings for the Plate Tectonics screen. */
-  public getPlateTectonicsA11yStrings() {
-    return stringProperties.a11y.plateTectonics;
+  /** Accessibility strings for the Earth screen. */
+  public getEarthA11yStrings() {
+    return stringProperties.a11y.earth;
   }
 
   /** Labels for the Crust screen's sliders, readouts and zoom control. */
@@ -130,7 +132,17 @@ export class StringManager {
     return stringProperties.a11y.plateMotion;
   }
 
-  /** Names of the global map and the three cross-section views. */
+  /** Labels for the Deep Time screen's layers, clock and reconstruction credit. */
+  public getDeepTimeStrings() {
+    return stringProperties.deepTime;
+  }
+
+  /** Accessibility strings for the Deep Time screen. */
+  public getDeepTimeA11yStrings() {
+    return stringProperties.a11y.deepTime;
+  }
+
+  /** Labels for the globe / flat-map switch and its hints. */
   public getViewStrings() {
     return stringProperties.views;
   }
@@ -155,7 +167,7 @@ export class StringManager {
     return stringProperties.legend;
   }
 
-  /** Labels drawn on the boundary cross-sections. */
+  /** Labels drawn on the schematic cross-sections and the 3-D block. */
   public getSectionStrings() {
     return stringProperties.section;
   }

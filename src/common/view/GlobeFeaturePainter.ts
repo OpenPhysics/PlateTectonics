@@ -1,41 +1,35 @@
 /**
- * GlobeCanvasNode.ts
+ * GlobeFeaturePainter.ts
  *
- * The global map painted onto a rotatable 3-D globe, using the same datasets and the
- * same colours as the flat map — see {@link EarthCanvasNode}, which owns everything
- * the two views share.
+ * Turning a polyline of longitudes and latitudes into a canvas path on a globe.
  *
- * ── Drawing a sphere as a sphere ──────────────────────────────────────────────
- * The flat map's hard cases (the antimeridian, circumpolar rings) simply do not
- * arise here: a sphere has no seam and no edges. They are replaced by one case of
- * its own — the limb, the circle where the near hemisphere ends — and everything
- * below is about it:
+ * This is the hard half of drawing a sphere as a sphere, and it is shared by every
+ * screen that does: the Earth screen's `GlobeCanvasNode` and the Deep Time
+ * screen's `DeepTimeCanvasNode` paint completely different datasets, moved by
+ * completely different reconstructions, but a coastline crossing the limb is the same
+ * problem in both.
  *
- *  - **Points** (earthquakes, volcanoes, hotspots) are dropped when they face away.
- *    That is handled once, in the base class, by `EarthProjection.project`.
- *  - **Polylines** (coastline outlines, plate outlines, boundaries) are cut at the
- *    limb: the crossing is found by interpolating on `GlobeProjection.depth`, which
- *    changes sign exactly there, so a segment ends *on* the limb rather than at the
- *    last visible vertex.
- *  - **Filled polygons** (plates, land) cannot simply be cut, because a polygon that
- *    runs round the back has to stay closed. Where the outline dips behind the limb
- *    it detours to a ring outside the disc, skirts that ring round to where the
- *    outline reappears, and drops back in. The disc clip then trims the detour away,
- *    leaving a clean round edge. This is the trick NAAP's globe uses, and it is why
- *    `clipToViewport` clips to the disc rather than to the viewport rectangle.
+ * ── The three cases ───────────────────────────────────────────────────────────
+ *  - **Long segments** are subdivided along the great circle between their ends.
+ *    The datasets were shaped for a flat map, where a straight line between two
+ *    vertices is the right answer: one plate edge runs 66° of latitude in a single
+ *    step. Drawn straight on a globe that step is a *chord* — a line clean across
+ *    the disc, through the middle of the Earth instead of over its surface.
+ *  - **Open lines** are cut at the limb, by interpolating on `GlobeProjection.depth`,
+ *    which changes sign exactly there. A run therefore ends *on* the limb rather than
+ *    at the last visible vertex.
+ *  - **Filled polygons** cannot simply be cut, because a polygon that runs round the
+ *    back has to stay closed. Where the outline dips behind the limb it detours to a
+ *    ring outside the disc, skirts round to where it reappears, and drops back in.
+ *    The caller's disc clip then trims the detour away, leaving a clean round edge.
  *
- * The relief raster is an equirectangular image, so it cannot just be drawn onto a
- * disc. Instead each pixel of the disc is un-projected back to a longitude and
- * latitude and sampled from the raster, into a texture that is rebuilt only when the
- * camera moves.
+ * The painter is deliberately ignorant of *what* it is drawing. It takes a
+ * {@link SurfaceTransform} — anything that can move a present-day point to where it
+ * was — and a frame index per feature or per vertex, and asks no further questions.
  */
 
-import type { CanvasNodeOptions } from "scenerystack/scenery";
-import { wrapLongitude } from "../../common/EarthProjection.js";
-import type { GlobeProjection } from "../../common/GlobeProjection.js";
-import PlateTectonicsColors from "../../PlateTectonicsColors.js";
-import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
-import { EarthCanvasNode, isSeamSegment, type RingMode } from "./EarthCanvasNode.js";
+import { wrapLongitude } from "../EarthProjection.js";
+import type { GlobeProjection } from "../GlobeProjection.js";
 
 const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -56,21 +50,70 @@ const DETOUR_CHORD_CLEARANCE = 1.1;
 
 /**
  * Longest piece of a feature, in degrees of arc, that may be drawn as a straight line.
- * At the size the globe is drawn a five-degree arc bows less than a fifth of a pixel
+ * At the size a globe is drawn a five-degree arc bows less than a fifth of a pixel
  * away from its chord, so this is about keeping long segments *on the sphere* rather
- * than about smoothness — see {@link GlobeCanvasNode.traceFeature}.
+ * than about smoothness.
  */
 const MAX_SEGMENT_DEGREES = 5;
 
 /** Starting size of the scratch buffers, chosen to cover most features in one go. */
 const INITIAL_BUFFER_CAPACITY = 1024;
 
+/**
+ * How close to ±180° of longitude, or to a pole, a vertex has to be for its segment to
+ * count as a dataset seam. The seams sit on those lines exactly, so this only has to
+ * absorb the last digit of the stored coordinate — see {@link isSeamSegment}.
+ */
+const SEAM_TOLERANCE_DEGREES = 1e-6;
+
 const mod2pi = (angle: number): number => ((angle % TWO_PI) + TWO_PI) % TWO_PI;
 
-export type GlobeCanvasNodeOptions = CanvasNodeOptions;
+/** How a traced feature will be used, which decides how (and whether) it is closed. */
+export type RingMode = "fill" | "stroke" | "open";
 
-export class GlobeCanvasNode extends EarthCanvasNode {
+/**
+ * Anything that can carry a present-day geographic point to where it was.
+ *
+ * Both reconstructions in this sim satisfy this: `PlateReconstruction`, which spins
+ * each plate about a fixed Euler pole at a constant rate, and
+ * `DeepTimeReconstruction`, which interpolates a published model's sampled rotations.
+ * The painter does not care which, only that `transform` writes {@link lon} and
+ * {@link lat} — neither returns an object, because this runs tens of thousands of
+ * times per frame.
+ */
+export interface SurfaceTransform {
+  readonly lon: number;
+  readonly lat: number;
+  /** True when `transform` is the identity, so tear rules can be skipped. */
+  readonly isPresentDay: boolean;
+  transform(lon: number, lat: number, frame: number): void;
+}
+
+/**
+ * Whether a source segment is a seam cut into the dataset to make it fit a rectangle,
+ * rather than a real edge of the feature.
+ *
+ * A plate that straddles the antimeridian is stored as a polygon slit open along
+ * ±180°, and one that reaches a pole is closed off along the pole itself. They are not
+ * edges of anything, so they are never *stroked*: on the globe they would draw as
+ * bright lines up the middle of the Pacific and across the Arctic, and on the flat map
+ * they do the same as soon as the map is panned off centre and ±180° stops being the
+ * edge of the viewport. They are still *filled*, because the polygon needs them to close.
+ *
+ * Judged on the source coordinates, because a seam is a property of how the dataset
+ * was cut, not of where the reconstruction has since carried it.
+ */
+export function isSeamSegment(lonA: number, latA: number, lonB: number, latB: number): boolean {
+  const onAntimeridian =
+    Math.abs(Math.abs(lonA) - 180) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(lonB) - 180) < SEAM_TOLERANCE_DEGREES;
+  const alongPole =
+    Math.abs(Math.abs(latA) - 90) < SEAM_TOLERANCE_DEGREES && Math.abs(Math.abs(latB) - 90) < SEAM_TOLERANCE_DEGREES;
+  return onAntimeridian || alongPole;
+}
+
+export class GlobeFeaturePainter {
   private readonly globe: GlobeProjection;
+  private readonly surface: SurfaceTransform;
 
   /** Geometry of the detour ring used to close filled outlines round the limb. */
   private readonly detourRadius: number;
@@ -95,131 +138,28 @@ export class GlobeCanvasNode extends EarthCanvasNode {
   private crossingX = 0;
   private crossingY = 0;
 
-  /** Pixels of the relief raster, read once so the globe texture can sample them. */
-  private reliefPixels: ImageData | null = null;
-
-  /** The relief raster resampled onto the disc, and the camera it was built for. */
-  private reliefTexture: HTMLCanvasElement | null = null;
-  private textureLongitude = Number.NaN;
-  private textureLatitude = Number.NaN;
-
-  public constructor(model: PlateTectonicsModel, projection: GlobeProjection, options?: GlobeCanvasNodeOptions) {
-    super(model, projection, options);
-    this.globe = projection;
-    this.detourRadius = projection.radius * DETOUR_RING_RATIO;
+  public constructor(globe: GlobeProjection, surface: SurfaceTransform) {
+    this.globe = globe;
+    this.surface = surface;
+    this.detourRadius = globe.radius * DETOUR_RING_RATIO;
     this.detourStep = 2 * Math.acos(DETOUR_CHORD_CLEARANCE / DETOUR_RING_RATIO);
   }
 
-  protected override clipToViewport(context: CanvasRenderingContext2D): void {
-    context.beginPath();
-    context.arc(this.globe.centerX, this.globe.centerY, this.globe.radius, 0, TWO_PI);
-    context.clip();
-  }
-
-  // ── Base map ────────────────────────────────────────────────────────────────
-
-  protected override paintBase(context: CanvasRenderingContext2D): void {
-    const texture = this.showRelief ? this.reliefTextureForCamera() : null;
-    if (texture) {
-      const size = this.globe.radius * 2;
-      context.drawImage(
-        texture,
-        this.globe.centerX - this.globe.radius,
-        this.globe.centerY - this.globe.radius,
-        size,
-        size,
-      );
-      return;
-    }
-
-    context.fillStyle = PlateTectonicsColors.oceanColorProperty.value.toCSS();
-    context.beginPath();
-    context.arc(this.globe.centerX, this.globe.centerY, this.globe.radius, 0, TWO_PI);
-    context.fill();
-
-    this.paintLandRings(context);
-  }
-
-  protected override reliefImageChanged(): void {
-    this.reliefPixels = this.reliefImage ? readImagePixels(this.reliefImage) : null;
-    this.reliefTexture = null;
-  }
-
   /**
-   * The relief raster resampled onto the disc for the current camera, rebuilt only
-   * when the camera has moved. Returns null when the raster is unavailable — a build
-   * that inlines it from another origin would taint the canvas it is read through —
-   * in which case the globe falls back to plain ocean and coastlines.
+   * Appends one polyline of geographic coordinates to the *current* path — the caller
+   * owns `beginPath`, `fill` and `stroke`, so many features can share one path.
+   *
+   * @param coords - flat `[lon, lat, …]` array in degrees
+   * @param frames - a single motion frame for the whole feature, or one per vertex
+   * @param mode - whether the path is about to be filled, stroked as a closed ring, or
+   * stroked as an open line
+   * @param tearAtFrameChanges - whether to break the outline where consecutive vertices
+   * ride different frames. True for coastlines, which really are cut where a plate
+   * boundary crosses them — Baja California leaves the mainland behind. False for plate
+   * outlines, whose vertices change frame at every triple junction while the outline
+   * itself stays a single closed ring.
    */
-  private reliefTextureForCamera(): HTMLCanvasElement | null {
-    const pixels = this.reliefPixels;
-    if (!pixels) {
-      return null;
-    }
-
-    const longitude = this.globe.centerLongitudeProperty.value;
-    const latitude = this.globe.centerLatitudeProperty.value;
-    if (this.reliefTexture && longitude === this.textureLongitude && latitude === this.textureLatitude) {
-      return this.reliefTexture;
-    }
-
-    const size = Math.ceil(this.globe.radius * 2);
-    const canvas = this.reliefTexture ?? document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      return null;
-    }
-
-    const target = context.createImageData(size, size);
-    const source = pixels.data;
-    const sourceWidth = pixels.width;
-    const sourceHeight = pixels.height;
-    const left = this.globe.centerX - this.globe.radius;
-    const top = this.globe.centerY - this.globe.radius;
-
-    const radius = this.globe.radius;
-    for (let row = 0; row < size; row++) {
-      // Only the pixels on the disc have any Earth under them, and on a row that is
-      // `dy` from the centre those run half a chord either side of it. Walking just
-      // that span keeps the corners of the square out of the inner loop, which is the
-      // one that runs a couple of hundred thousand times every time the globe turns.
-      const dy = this.globe.centerY - (top + row + 0.5);
-      const halfChordSquared = radius * radius - dy * dy;
-      if (halfChordSquared <= 0) {
-        continue;
-      }
-      const halfChord = Math.sqrt(halfChordSquared);
-      const firstColumn = Math.max(0, Math.floor(this.globe.centerX - halfChord - left));
-      const lastColumn = Math.min(size - 1, Math.ceil(this.globe.centerX + halfChord - left));
-
-      for (let column = firstColumn; column <= lastColumn; column++) {
-        // Sample at pixel centres, so the disc is not half a pixel off.
-        if (!this.globe.unproject(left + column + 0.5, top + row + 0.5)) {
-          continue; // outside the globe: left transparent
-        }
-        const sourceColumn = Math.min(sourceWidth - 1, Math.floor(((this.globe.lon + 180) / 360) * sourceWidth));
-        const sourceRow = Math.min(sourceHeight - 1, Math.floor(((90 - this.globe.lat) / 180) * sourceHeight));
-        const from = (sourceRow * sourceWidth + sourceColumn) * 4;
-        const to = (row * size + column) * 4;
-        target.data[to] = source[from] as number;
-        target.data[to + 1] = source[from + 1] as number;
-        target.data[to + 2] = source[from + 2] as number;
-        target.data[to + 3] = 255;
-      }
-    }
-    context.putImageData(target, 0, 0);
-
-    this.reliefTexture = canvas;
-    this.textureLongitude = longitude;
-    this.textureLatitude = latitude;
-    return canvas;
-  }
-
-  // ── Path helpers ────────────────────────────────────────────────────────────
-
-  protected override appendFeature(
+  public appendFeature(
     context: CanvasRenderingContext2D,
     coords: readonly number[],
     frames: number | readonly number[],
@@ -229,27 +169,18 @@ export class GlobeCanvasNode extends EarthCanvasNode {
     const count = this.traceFeature(coords, frames);
     if (mode === "fill") {
       this.appendFilledOutline(context, count);
-    } else {
-      // Same tear rule as the flat map: once the plates have moved, neighbouring
-      // coastline vertices riding different plates are hundreds of kilometres apart,
-      // and joining them would draw a stray line across the ocean.
-      const breakAtFrameChanges = tearAtFrameChanges && typeof frames !== "number" && !this.reconstruction.isPresentDay;
-      this.appendVisiblePolyline(context, count, breakAtFrameChanges);
+      return;
     }
+    // Once the plates have moved, neighbouring vertices riding different frames are
+    // hundreds of kilometres apart, and joining them would draw a stray line across
+    // the ocean.
+    const breakAtFrameChanges = tearAtFrameChanges && typeof frames !== "number" && !this.surface.isPresentDay;
+    this.appendVisiblePolyline(context, count, breakAtFrameChanges);
   }
 
   /**
    * Projects a feature's vertices into the scratch buffers, subdividing any segment
    * long enough for the difference between a great circle and a straight line to show.
-   *
-   * That difference is the whole reason this step exists. The datasets were shaped for
-   * a flat map, where a straight line between two vertices is the right answer and
-   * long segments are harmless: the Pacific plate's eastern edge runs 66° of latitude
-   * up the antimeridian in a single step. Drawn straight on a globe, that step is a
-   * chord — a line clean across the disc, cutting through the middle of the Earth
-   * instead of following its surface. Sampling the great circle every few degrees puts
-   * it back on the surface, where the limb can then hide the part that is round the back.
-   *
    * Returns how many points were buffered.
    */
   private traceFeature(coords: readonly number[], frames: number | readonly number[]): number {
@@ -264,16 +195,13 @@ export class GlobeCanvasNode extends EarthCanvasNode {
       const frame = perVertex ? ((frames[vertex] as number) ?? 0) : frames;
       const sourceLon = coords[vertex * 2] as number;
       const sourceLat = coords[vertex * 2 + 1] as number;
-      // Whether the segment arriving here is a seam, judged on the *source*
-      // coordinates: a seam is a property of how the dataset was cut, not of where
-      // the reconstruction has since carried it.
       const seam =
         vertex > 0 &&
         isSeamSegment(coords[vertex * 2 - 2] as number, coords[vertex * 2 - 1] as number, sourceLon, sourceLat);
 
-      this.reconstruction.transform(sourceLon, sourceLat, frame);
-      const lon = this.reconstruction.lon;
-      const lat = this.reconstruction.lat;
+      this.surface.transform(sourceLon, sourceLat, frame);
+      const lon = this.surface.lon;
+      const lat = this.surface.lat;
 
       if (vertex > 0) {
         const steps = subdivisionsFor(previousLon, previousLat, lon, lat);
@@ -573,25 +501,4 @@ function subdivisionsFor(lonA: number, latA: number, lonB: number, latB: number)
   const meanLat = ((latA + latB) / 2) * DEG_TO_RAD;
   const separation = Math.hypot(deltaLat, deltaLon * Math.cos(meanLat));
   return separation <= MAX_SEGMENT_DEGREES ? 1 : Math.ceil(separation / MAX_SEGMENT_DEGREES);
-}
-
-/**
- * Reads an image's pixels through an offscreen canvas. Returns null if the browser
- * refuses — a cross-origin image taints the canvas it is drawn on — so the caller can
- * fall back rather than throw.
- */
-function readImagePixels(image: HTMLImageElement): ImageData | null {
-  const canvas = document.createElement("canvas");
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) {
-    return null;
-  }
-  context.drawImage(image, 0, 0);
-  try {
-    return context.getImageData(0, 0, canvas.width, canvas.height);
-  } catch {
-    return null;
-  }
 }

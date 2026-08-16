@@ -24,7 +24,7 @@
  */
 
 import { type ScalarGrid, traceContours } from "./data/contour.js";
-import { fetchElevationGrid, sampleElevation } from "./data/dem.js";
+import { fetchElevationGrid } from "./data/dem.js";
 import { numberArray, round, wrap, writeGeneratedModule } from "./data/emit.js";
 import { fetchBinary, fetchJson, fetchText } from "./data/fetchCache.js";
 import {
@@ -32,15 +32,16 @@ import {
   dot,
   greatCircleDistanceKm,
   type LonLat,
-  Profile,
   pointInRing,
   ringBounds,
   ringCentroid,
   signedArea,
   simplify,
+  simplifyGreatCircle,
   toLonLat,
   toUnitVector,
 } from "./data/geo.js";
+import { type GPlatesModelData, resolvePlateHistory } from "./data/gplates.js";
 import { readNetCdf } from "./data/netcdf.js";
 
 const GENERATED_DIR = "src/common/data/generated";
@@ -1284,213 +1285,267 @@ async function buildRelief(): Promise<void> {
   console.log(`  wrote ${path}`);
 }
 
-// ── Cross-sections ────────────────────────────────────────────────────────────
+// ── Deep-time plate history ───────────────────────────────────────────────────
 
-interface SectionConfig {
-  key: "subduction" | "divergent" | "transform";
-  /** Profile end points, degrees. The profile runs left-to-right on screen. */
-  start: LonLat;
-  end: LonLat;
-  /** How far either side of the profile earthquakes are collected, km. */
-  corridorHalfWidthKm: number;
-  maxDepthKm: number;
-  /** Minimum magnitude for this section's earthquake query. */
-  minMagnitude: number;
-  /** Number of evenly spaced elevation samples along the profile. */
-  sampleCount: number;
+/**
+ * Span and sampling of the baked reconstruction.
+ *
+ * 250 Ma is the full reach of the Müller et al. (2019) model, and takes the sim from
+ * Pangaea to the present. The 5 Myr step is a straight trade against the size of the
+ * generated module: topologies have to be baked per instant (see `dataTypes.ts`), so
+ * halving the step doubles that file.
+ */
+const HISTORY_END_MA = 250;
+const HISTORY_STEP_MYR = 5;
+
+/**
+ * Simplification tolerances for the reconstructed geometry, in degrees of arc.
+ *
+ * Looser than the present-day datasets above, because there are fifty-one copies of
+ * this geometry rather than one. At the size the globe is drawn half a degree is
+ * about a pixel and a half.
+ */
+const HISTORY_RING_TOLERANCE = 0.5;
+const HISTORY_BOUNDARY_TOLERANCE = 0.4;
+const HISTORY_COASTLINE_TOLERANCE = 0.35;
+
+/**
+ * Deforming belts take a coarser tolerance than rigid plates. There are as many of
+ * them as there are plates, and they are drawn as a wash showing *where* the
+ * lithosphere is deforming rather than as a shape with a meaningful edge — the edge
+ * of an orogen is a gradient in the model, not a line.
+ */
+const HISTORY_DEFORMING_TOLERANCE = 1;
+
+/** Rings and lines left with fewer vertices than this after simplification are dropped. */
+const HISTORY_MIN_RING_VERTICES = 4;
+const HISTORY_MIN_LINE_VERTICES = 2;
+
+/** Flat `[lon, lat, …]` → `LonLat[]`, and back again with the coordinates rounded. */
+function toPairs(coords: readonly number[]): LonLat[] {
+  const pairs: LonLat[] = [];
+  for (let i = 0; i + 1 < coords.length; i += 2) {
+    pairs.push([coords[i] as number, coords[i + 1] as number]);
+  }
+  return pairs;
+}
+
+function toFlat(pairs: readonly LonLat[]): number[] {
+  return pairs.flatMap(([lon, lat]) => [round(lon, 2), round(lat, 2)]);
+}
+
+/** Simplifies one reconstructed feature, returning null when nothing usable is left. */
+function simplifyFeature(coords: readonly number[], tolerance: number, minVertices: number): number[] | null {
+  const simplified = simplifyGreatCircle(toPairs(coords), tolerance);
+  return simplified.length >= minVertices ? toFlat(simplified) : null;
 }
 
 /**
- * One profile per boundary type, each across a classic example:
+ * Builds the Deep Time screen's two generated modules from the GPlates model.
  *
- *  - subduction: the Peru–Chile trench at 21.5° S, where the Nazca plate dives
- *    beneath South America and the Wadati–Benioff zone reaches ~650 km.
- *  - divergent: the Mid-Atlantic Ridge at 24° N, halfway between North America
- *    and Africa.
- *  - transform: the San Andreas fault at Parkfield, sampled perpendicular to the
- *    fault's N40°W strike.
+ * The rotation table is de-duplicated before it is written: a model this detailed
+ * carries several hundred plate IDs, and most of them are small terranes rigidly
+ * attached to a major plate, so their rotation sequences are identical to it and to
+ * each other. Sharing one row between them costs a level of indirection and saves
+ * most of the table.
  */
-const SECTIONS: readonly SectionConfig[] = [
-  {
-    key: "subduction",
-    start: [-74.5, -21.5],
-    end: [-60.5, -21.5],
-    corridorHalfWidthKm: 200,
-    maxDepthKm: 700,
-    minMagnitude: 4.5,
-    sampleCount: 320,
-  },
-  {
-    key: "divergent",
-    start: [-50.0, 24.0],
-    end: [-40.0, 24.0],
-    corridorHalfWidthKm: 120,
-    maxDepthKm: 60,
-    minMagnitude: 4.0,
-    sampleCount: 320,
-  },
-  {
-    key: "transform",
-    start: [-121.62, 35.09],
-    end: [-119.24, 36.71],
-    corridorHalfWidthKm: 40,
-    maxDepthKm: 40,
-    minMagnitude: 3.0,
-    sampleCount: 320,
-  },
-];
+async function buildPlateHistory(): Promise<void> {
+  const data = await resolvePlateHistory(HISTORY_END_MA, HISTORY_STEP_MYR);
 
-async function buildCrossSections(
-  boundaries: readonly BoundarySegmentBuild[],
-  volcanoes: readonly VolcanoBuild[],
-): Promise<void> {
-  const modules: string[] = [];
+  // ── Rotation table, de-duplicated ──
+  const slotOfSequence = new Map<string, number>();
+  const slotOfPlateId = new Map<number, number>();
+  const rotationRows: number[][] = [];
 
-  for (const config of SECTIONS) {
-    const { start, end } = config;
-    const profile = new Profile(start, end);
+  // Row 0 is reserved for the identity, and seeded before anything else so it keeps
+  // that index. Geometry that is *already* at the reconstructed instant — a resolved
+  // plate polygon, a resolved boundary — is drawn through the same painter as the
+  // coastlines, and needs a row that provably does not move it. A plate that happens
+  // never to rotate de-duplicates onto this row, which is correct.
+  const identityRow = data.times.flatMap(() => [0, 0, 0]);
+  slotOfSequence.set(identityRow.join(","), 0);
+  rotationRows.push(identityRow);
 
-    // Elevation along the profile, from a DEM tile covering its neighbourhood.
-    const pad = 1.5;
-    const bounds: [number, number, number, number] = [
-      Math.min(start[0], end[0]) - pad,
-      Math.min(start[1], end[1]) - pad,
-      Math.max(start[0], end[0]) + pad,
-      Math.max(start[1], end[1]) + pad,
-    ];
-    const spanLon = bounds[2] - bounds[0];
-    const spanLat = bounds[3] - bounds[1];
-    const tileWidth = Math.min(1200, Math.max(200, Math.round(spanLon * 60)));
-    const tileHeight = Math.min(1200, Math.max(200, Math.round(spanLat * 60)));
-    const grid = await fetchElevationGrid(bounds, tileWidth, tileHeight, `dem_${config.key}.tif`);
-
-    const elevations: number[] = [];
-    for (let i = 0; i < config.sampleCount; i++) {
-      const distanceKm = (profile.lengthKm * i) / (config.sampleCount - 1);
-      const [lon, lat] = profile.pointAt(distanceKm);
-      elevations.push(Math.round(sampleElevation(grid, lon, lat)));
+  for (const [plateId, samples] of Object.entries(data.rotations)) {
+    const flat = samples.flatMap((sample) => [
+      round(sample[0] as number, 3),
+      round(sample[1] as number, 3),
+      round(sample[2] as number, 4),
+    ]);
+    const key = flat.join(",");
+    let slot = slotOfSequence.get(key);
+    if (slot === undefined) {
+      slot = rotationRows.length;
+      slotOfSequence.set(key, slot);
+      rotationRows.push(flat);
     }
-
-    // Earthquakes inside the corridor, projected onto the profile.
-    const latitudes = [start[1], end[1]];
-    const longitudes = [start[0], end[0]];
-    const degreePad = config.corridorHalfWidthKm / 111 + 0.5;
-    const quakes = await fetchQuakes(
-      {
-        starttime: "1980-01-01",
-        minmagnitude: config.minMagnitude,
-        minlatitude: round(Math.min(...latitudes) - degreePad, 2),
-        maxlatitude: round(Math.max(...latitudes) + degreePad, 2),
-        minlongitude: round(Math.min(...longitudes) - degreePad, 2),
-        maxlongitude: round(Math.max(...longitudes) + degreePad, 2),
-        orderby: "time",
-      },
-      `usgs_${config.key}.json`,
-    );
-
-    const sectionQuakes = quakes
-      .map((quake) => ({ quake, projected: profile.project(quake.lon, quake.lat) }))
-      .filter(
-        ({ projected }) =>
-          Math.abs(projected.offsetKm) <= config.corridorHalfWidthKm &&
-          projected.distanceKm >= 0 &&
-          projected.distanceKm <= profile.lengthKm,
-      )
-      .map(({ quake, projected }) => ({
-        distanceKm: round(projected.distanceKm, 1),
-        depthKm: quake.depthKm,
-        magnitude: quake.magnitude,
-      }));
-
-    // Volcanoes inside the corridor.
-    const sectionVolcanoes = volcanoes
-      .map((volcano) => ({ volcano, projected: profile.project(volcano.lon, volcano.lat) }))
-      .filter(
-        ({ projected }) =>
-          Math.abs(projected.offsetKm) <= config.corridorHalfWidthKm &&
-          projected.distanceKm >= 0 &&
-          projected.distanceKm <= profile.lengthKm,
-      )
-      .map(({ volcano, projected }) => ({
-        distanceKm: round(projected.distanceKm, 1),
-        elevationM: volcano.elevationM,
-        name: volcano.name,
-      }));
-
-    // Where plate boundaries cross the profile. A boundary crosses when the signed
-    // perpendicular offset of two consecutive vertices changes sign; the crossing
-    // point is interpolated between them.
-    const crossings: { distanceKm: number; type: BoundaryType; plates: string; velocity: number }[] = [];
-    for (const segment of boundaries) {
-      for (let i = 1; i < segment.points.length; i++) {
-        const previous = profile.project(...(segment.points[i - 1] as LonLat));
-        const next = profile.project(...(segment.points[i] as LonLat));
-        if (previous.offsetKm === next.offsetKm || previous.offsetKm > 0 === next.offsetKm > 0) {
-          continue;
-        }
-        const t = previous.offsetKm / (previous.offsetKm - next.offsetKm);
-        const distanceKm = previous.distanceKm + t * (next.distanceKm - previous.distanceKm);
-        if (distanceKm < 0 || distanceKm > profile.lengthKm) {
-          continue;
-        }
-        crossings.push({
-          distanceKm: round(distanceKm, 1),
-          type: segment.type,
-          plates: segment.plates,
-          velocity: round(segment.velocity, 1),
-        });
-      }
-    }
-    crossings.sort((a, b) => a.distanceKm - b.distanceKm);
-
-    modules.push(
-      [
-        `  {`,
-        `    key: ${JSON.stringify(config.key)},`,
-        `    lengthKm: ${round(profile.lengthKm, 1)},`,
-        `    maxDepthKm: ${config.maxDepthKm},`,
-        `    corridorHalfWidthKm: ${config.corridorHalfWidthKm},`,
-        `    earthquakeDescription: ${JSON.stringify(
-          `USGS/ANSS, magnitude ${config.minMagnitude}+ since 1980, within ${config.corridorHalfWidthKm} km of the profile`,
-        )},`,
-        `    elevationsM: ${numberArray(elevations)},`,
-        `    boundaryCrossings: [`,
-        ...crossings.map(
-          (crossing) =>
-            `      { distanceKm: ${crossing.distanceKm}, type: ${JSON.stringify(crossing.type)},` +
-            ` plates: ${JSON.stringify(crossing.plates)}, velocityMmPerYear: ${crossing.velocity} },`,
-        ),
-        `    ],`,
-        `    earthquakes: [`,
-        wrap(
-          sectionQuakes
-            .map((q) => `{ distanceKm: ${q.distanceKm}, depthKm: ${q.depthKm}, magnitude: ${q.magnitude} },`)
-            .join(""),
-          "      ",
-        ),
-        `    ],`,
-        `    volcanoes: [`,
-        ...sectionVolcanoes.map(
-          (v) => `      { distanceKm: ${v.distanceKm}, elevationM: ${v.elevationM}, name: ${JSON.stringify(v.name)} },`,
-        ),
-        `    ],`,
-        `  },`,
-      ].join("\n"),
-    );
-
-    console.log(
-      `  ${config.key}: ${round(profile.lengthKm, 0)} km profile, ${sectionQuakes.length} earthquakes, ` +
-        `${sectionVolcanoes.length} volcanoes, ${crossings.length} boundary crossings`,
-    );
+    slotOfPlateId.set(Number(plateId), slot);
   }
 
+  // ── Coastlines ──
+  const coastlines: { slot: number; coords: number[] }[] = [];
+  for (const piece of data.coastlines) {
+    const coords = simplifyFeature(piece.coords, HISTORY_COASTLINE_TOLERANCE, 3);
+    const slot = slotOfPlateId.get(piece.plateId);
+    if (coords && slot !== undefined) {
+      coastlines.push({ slot, coords });
+    }
+  }
+
+  // ── Snapshots ──
+  const snapshots = data.snapshots.map((snapshot) => {
+    const plates = snapshot.plates
+      .map((plate) => ({
+        plateId: plate.id,
+        // Only rigid plates are labelled, so a deforming mesh's internal name — they
+        // read like "Alpine_Deforming_Mesh_ELB" — is not worth carrying.
+        name: plate.deforming ? "" : plate.name,
+        deforming: plate.deforming,
+        ring: simplifyFeature(
+          plate.ring,
+          plate.deforming ? HISTORY_DEFORMING_TOLERANCE : HISTORY_RING_TOLERANCE,
+          HISTORY_MIN_RING_VERTICES,
+        ),
+      }))
+      .filter((plate) => plate.ring !== null);
+
+    const boundaries = (["divergent", "convergent", "transform"] as const).map((type) => ({
+      type,
+      lines: snapshot.boundaries
+        .filter((boundary) => boundary.type === type)
+        .map((boundary) => simplifyFeature(boundary.coords, HISTORY_BOUNDARY_TOLERANCE, HISTORY_MIN_LINE_VERTICES))
+        .filter((line): line is number[] => line !== null),
+    }));
+
+    return { timeMa: snapshot.time, plates, boundaries };
+  });
+
+  emitPlateHistory(data, rotationRows, slotOfPlateId, coastlines);
+  emitPlateSnapshots(data, snapshots);
+
+  const vertices =
+    snapshots.reduce(
+      (total, snapshot) =>
+        total +
+        snapshot.plates.reduce((sum, plate) => sum + (plate.ring as number[]).length / 2, 0) +
+        snapshot.boundaries.reduce(
+          (sum, set) => sum + set.lines.reduce((lineSum, line) => lineSum + line.length / 2, 0),
+          0,
+        ),
+      0,
+    ) + coastlines.reduce((total, piece) => total + piece.coords.length / 2, 0);
+  console.log(
+    `  ${snapshots.length} snapshots, ${rotationRows.length} distinct rotation sequences ` +
+      `(from ${slotOfPlateId.size} plate IDs), ${coastlines.length} coastline pieces, ${vertices} vertices`,
+  );
+}
+
+function emitPlateHistory(
+  data: GPlatesModelData,
+  rotationRows: readonly (readonly number[])[],
+  slotOfPlateId: ReadonlyMap<number, number>,
+  coastlines: readonly { slot: number; coords: readonly number[] }[],
+): void {
+  const rotations = rotationRows.map((row) => `  ${numberArray(row)},`).join("\n");
+  const coastlineEntries = coastlines
+    .map((piece) => `  { rotationSlot: ${piece.slot}, coords: ${numberArray(piece.coords)} },`)
+    .join("\n");
+  const slots = [...slotOfPlateId.entries()].map(([plateId, slot]) => `  ${plateId}: ${slot},`).join("\n");
+
   writeGeneratedModule(
-    `${GENERATED_DIR}/crossSectionData.ts`,
-    `Cross-section profiles through a subduction zone (Chile trench), an oceanic
-spreading ridge (Mid-Atlantic Ridge) and a continental transform (San Andreas
-fault). Surface elevation comes from the NOAA DEM; earthquakes and volcanoes are
-real events projected onto the profile from a corridor either side of it.`,
-    `import type { CrossSectionData } from "../dataTypes.js";\n\nexport const CROSS_SECTIONS: readonly CrossSectionData[] = [\n${modules.join("\n")}\n];\n`,
+    `${GENERATED_DIR}/plateHistoryData.ts`,
+    `Continuous half of the Müller et al. (2019) reconstruction: the rotation table
+that carries every static feature, and the present-day coastlines it carries.
+
+HISTORY_TIMES_MA gives the sample times. HISTORY_ROTATIONS holds one row per
+distinct motion, three numbers per sample — Euler pole latitude, pole longitude and
+the total rotation angle in degrees, measured from the present day. Rows are shared
+by every plate ID that moves identically, which is most of them. Row 0 is always the
+identity, for geometry that is already at the instant being drawn.
+
+Applying a row's rotation to present-day geometry puts it where it was; interpolating
+between two samples is what lets the continents glide rather than jump. See
+DeepTimeReconstruction.ts.`,
+    `import type { HistoryCoastline } from "../dataTypes.js";
+
+/** The model this was built from, for the credits and the legend. */
+export const HISTORY_MODEL = ${JSON.stringify("Müller et al. (2019)")};
+
+/** Sample times in millions of years before present, ascending from zero. */
+export const HISTORY_TIMES_MA: readonly number[] = ${numberArray(data.times as number[])};
+
+/** Total reconstruction rotations: 3 numbers (poleLat, poleLon, angleDeg) per sample time. */
+export const HISTORY_ROTATIONS: readonly (readonly number[])[] = [
+${rotations}
+];
+
+/** GPlates plate ID → row of {@link HISTORY_ROTATIONS}. */
+export const HISTORY_ROTATION_SLOTS: Readonly<Record<number, number>> = {
+${slots}
+};
+
+export const HISTORY_COASTLINES: readonly HistoryCoastline[] = [
+${coastlineEntries}
+];
+`,
+  );
+}
+
+function emitPlateSnapshots(
+  data: GPlatesModelData,
+  snapshots: readonly {
+    timeMa: number;
+    plates: readonly { plateId: number; name: string; deforming: boolean; ring: number[] | null }[];
+    boundaries: readonly { type: string; lines: readonly number[][] }[];
+  }[],
+): void {
+  const entries = snapshots
+    .map((snapshot) => {
+      const plates = snapshot.plates
+        .map(
+          (plate) =>
+            `      { plateId: ${plate.plateId}, name: ${JSON.stringify(plate.name)}, ` +
+            `deforming: ${plate.deforming},\n        ring: ${numberArray(plate.ring as number[])} },`,
+        )
+        .join("\n");
+      const boundaries = snapshot.boundaries
+        .map(
+          (set) =>
+            `      { type: ${JSON.stringify(set.type)}, lines: [\n` +
+            `${set.lines.map((line) => `        ${numberArray(line)},`).join("\n")}\n      ] },`,
+        )
+        .join("\n");
+      return `  {
+    timeMa: ${snapshot.timeMa},
+    plates: [
+${plates}
+    ],
+    boundaries: [
+${boundaries}
+    ],
+  },`;
+    })
+    .join("\n");
+
+  writeGeneratedModule(
+    `${GENERATED_DIR}/plateSnapshotData.ts`,
+    `Stepped half of the Müller et al. (2019) reconstruction: the plates that existed
+at each sample time and the boundaries between them, resolved with pyGPlates.
+
+Unlike a coastline, a plate polygon has no present-day geometry to rotate — it is
+rebuilt at each instant from whichever boundary features bounded it then, and plates
+appear and vanish as ocean basins open and close. So this is baked per instant, and
+the Deep Time screen snaps it to the nearest sample while the continents glide.
+
+\`deforming\` marks an orogen or a rift, where the model explicitly does not treat the
+lithosphere as rigid.`,
+    `import type { PlateHistorySnapshot } from "../dataTypes.js";
+
+/** The ${data.snapshots.length} reconstructed instants, ascending in age from the present day. */
+export const PLATE_SNAPSHOTS: readonly PlateHistorySnapshot[] = [
+${entries}
+];
+`,
   );
 }
 
@@ -1502,7 +1557,7 @@ real events projected onto the profile from a corridor either side of it.`,
  * `plate-model` covers the plates, their boundaries and the motion frames together,
  * because those three index into each other and only mean anything as a set.
  */
-const STEPS = ["plate-model", "land", "earthquakes", "volcanoes", "seafloor-age", "relief", "cross-sections"] as const;
+const STEPS = ["plate-model", "land", "earthquakes", "volcanoes", "seafloor-age", "relief", "plate-history"] as const;
 type Step = (typeof STEPS)[number];
 
 async function main(): Promise<void> {
@@ -1544,12 +1599,9 @@ async function main(): Promise<void> {
     console.log(`  ${quakes.length} events`);
   }
 
-  // The cross-sections project real volcanoes onto their profiles, so asking for them
-  // rebuilds the volcano catalogue too.
-  let volcanoes: VolcanoBuild[] | null = null;
-  if (wanted("volcanoes") || wanted("cross-sections")) {
+  if (wanted("volcanoes")) {
     console.log("Building volcano catalogue…");
-    volcanoes = await buildVolcanoes(plates);
+    const volcanoes = await buildVolcanoes(plates);
     console.log(`  ${volcanoes.length} volcanoes`);
   }
 
@@ -1563,9 +1615,9 @@ async function main(): Promise<void> {
     await buildRelief();
   }
 
-  if (wanted("cross-sections")) {
-    console.log("Building cross-sections…");
-    await buildCrossSections(boundaries, volcanoes as VolcanoBuild[]);
+  if (wanted("plate-history")) {
+    console.log("Building deep-time plate history…");
+    await buildPlateHistory();
   }
 
   console.log("\nDone.");

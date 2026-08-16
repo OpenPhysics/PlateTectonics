@@ -1,5 +1,5 @@
 /**
- * PlateTectonicsScreenSummaryContent.ts
+ * EarthScreenSummaryContent.ts
  *
  * The accessible screen summary: what the play area holds, what the controls do,
  * a live description of the current state, and a hint for getting started.
@@ -12,49 +12,21 @@
 
 import { DerivedStringProperty, PatternStringProperty } from "scenerystack/axon";
 import { ScreenSummaryContent } from "scenerystack/sim";
-import type { ViewKey } from "../../common/data/dataTypes.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import { PRESENT_DAY_TOLERANCE_MYR } from "../../PlateTectonicsConstants.js";
+import type { EarthModel } from "../model/EarthModel.js";
 import type { EarthquakeDepthFilter } from "../model/EarthquakeDepthFilter.js";
-import type { PlateTectonicsModel } from "../model/PlateTectonicsModel.js";
 
-export class PlateTectonicsScreenSummaryContent extends ScreenSummaryContent {
-  public constructor(model: PlateTectonicsModel) {
+export class EarthScreenSummaryContent extends ScreenSummaryContent {
+  public constructor(model: EarthModel) {
     const strings = StringManager.getInstance();
-    const a11y = strings.getPlateTectonicsA11yStrings();
+    const a11y = strings.getEarthA11yStrings();
     const layerStrings = strings.getLayerStrings();
 
     // Which view is on screen.
     const viewDescription = new DerivedStringProperty(
-      [
-        model.selectedViewProperty,
-        model.showGlobeProperty,
-        a11y.viewDetails.globalStringProperty,
-        a11y.viewDetails.globeStringProperty,
-        a11y.viewDetails.subductionStringProperty,
-        a11y.viewDetails.divergentStringProperty,
-        a11y.viewDetails.transformStringProperty,
-      ],
-      (
-        view: ViewKey,
-        showGlobe: boolean,
-        global: string,
-        globe: string,
-        subduction: string,
-        divergent: string,
-        transform: string,
-      ) => {
-        if (view === "subduction") {
-          return subduction;
-        }
-        if (view === "divergent") {
-          return divergent;
-        }
-        if (view === "transform") {
-          return transform;
-        }
-        return showGlobe ? globe : global;
-      },
+      [model.showGlobeProperty, a11y.viewDetails.globalStringProperty, a11y.viewDetails.globeStringProperty],
+      (showGlobe: boolean, global: string, globe: string) => (showGlobe ? globe : global),
     );
 
     // Which layers are switched on, listed by name.

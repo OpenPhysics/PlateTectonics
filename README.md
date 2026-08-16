@@ -5,14 +5,14 @@
 An interactive map of the Earth's tectonic plates, built with
 [SceneryStack](https://scenerystack.org/) — and drawn from real data throughout.
 
-Toggle layers over a shaded relief map of the world to see why earthquakes, volcanoes,
-mountains and trenches are all in the same places; or drop into a cross-section through
-a subduction zone, a spreading ridge or a transform fault, where the descending slab is
-fitted to the earthquakes that trace it.
+Toggle layers over a shaded relief map of the world — on a globe you can turn, or on a
+flat map you can pan and zoom — to see why earthquakes, volcanoes, mountains and
+trenches are all in the same places.
 
 ## Features
 
-**Global map**
+**Earth** — a 3-D globe you can turn, or a flat map you can pan
+and zoom, with the same layers drawn on either.
 
 - **Plate boundaries** from the PB2002 plate model, colour-coded divergent /
   convergent / transform.
@@ -27,11 +27,6 @@ fitted to the earthquakes that trace it.
   contoured from the EarthByte age grid. The youngest crust hugs every spreading
   ridge and the same ages appear at the same distance on both flanks, getting older
   out to the continental margins — seafloor spreading, drawn from the measurements.
-
-**Cross-sections** — the Chile trench, the Mid-Atlantic Ridge, and the San Andreas
-fault. The surface profile comes from the DEM, the earthquakes and volcanoes are real
-events projected from a corridor either side of the profile line, and the slab is
-fitted to the hypocentres: the drawn slab *is* the Wadati–Benioff zone.
 
 **Geological time** — run plate motion from 50 million years in the past to 50 million
 years into the future at one million years per second. Continents drift, coastlines

@@ -3,7 +3,7 @@
  *
  * Reads global elevation / bathymetry from NOAA NCEI's public
  * `DEM_mosaics/DEM_global_mosaic` ArcGIS image service and exposes it as a plain
- * grid so the build can render the relief map and sample cross-section profiles.
+ * grid so the build can render the relief map.
  *
  * The service returns an uncompressed, tiled, signed-16-bit GeoTIFF, so a minimal
  * TIFF reader (below) is enough — no image library is involved.
@@ -170,23 +170,4 @@ export async function fetchElevationGrid(
     throw new Error(`Requested ${width}×${height} but the service returned ${decoded.width}×${decoded.height}`);
   }
   return { width, height, minLon, minLat, maxLon, maxLat, values: decoded.values };
-}
-
-/** Bilinear elevation sample (metres) at a geographic point. */
-export function sampleElevation(grid: ElevationGrid, lon: number, lat: number): number {
-  const fx = ((lon - grid.minLon) / (grid.maxLon - grid.minLon)) * grid.width - 0.5;
-  const fy = ((grid.maxLat - lat) / (grid.maxLat - grid.minLat)) * grid.height - 0.5;
-
-  const clampX = (x: number): number => Math.max(0, Math.min(grid.width - 1, x));
-  const clampY = (y: number): number => Math.max(0, Math.min(grid.height - 1, y));
-
-  const x0 = Math.floor(fx);
-  const y0 = Math.floor(fy);
-  const tx = fx - x0;
-  const ty = fy - y0;
-
-  const at = (x: number, y: number): number => grid.values[clampY(y) * grid.width + clampX(x)] ?? 0;
-  const top = at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx;
-  const bottom = at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx;
-  return top * (1 - ty) + bottom * ty;
 }

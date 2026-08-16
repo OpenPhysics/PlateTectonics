@@ -8,8 +8,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { PLATE_MOTION_STEP_MYR, SUBDUCTION_TIME_LIMIT_MYR } from "../src/PlateTectonicsConstants.js";
-import { PlateMotionModel } from "../src/plate-motion/model/PlateMotionModel.js";
+import {
+  MANUAL_DRAG_MAX_ANGLE_RAD,
+  MANUAL_DRAG_RATE_COEFFICIENT,
+  PLATE_MOTION_STEP_MYR,
+  SUBDUCTION_TIME_LIMIT_MYR,
+} from "../src/PlateTectonicsConstants.js";
+import { manualDragRateMyrPerSecond, PlateMotionModel } from "../src/plate-motion/model/PlateMotionModel.js";
 
 /** A model in state C: continental against old oceanic, converging. */
 function running(): PlateMotionModel {
@@ -166,5 +171,170 @@ describe("PlateMotionModel reset", () => {
     expect(model.showLabelsProperty.value).toBe(true);
     expect(model.showSeawaterProperty.value).toBe(true);
     expect(model.speedProperty.value).toBe(1);
+  });
+});
+
+describe("PlateMotionModel manual mode", () => {
+  it("does not advance the clock on its own", () => {
+    // The whole point of the mode: nothing happens until the user makes it happen. PhET's
+    // `allowClockTickOnFrame`.
+    const model = running();
+    model.isManualModeProperty.value = true;
+
+    model.step(5);
+
+    expect(model.timeMillionsOfYearsProperty.value).toBe(0);
+  });
+
+  it("still advances on its own in automatic mode", () => {
+    // The control against the test above — otherwise a `step` that had stopped working
+    // for an unrelated reason would look like manual mode working.
+    const model = running();
+    model.step(5);
+    expect(model.timeMillionsOfYearsProperty.value).toBeGreaterThan(0);
+  });
+
+  it("advances by a handle drag, clamped at both ends of the run", () => {
+    const model = running();
+    model.isManualModeProperty.value = true;
+
+    model.advanceManual(6);
+    expect(model.timeMillionsOfYearsProperty.value).toBeCloseTo(6, 9);
+
+    // Pushing a handle back the way it came rewinds — but not past the beginning, which
+    // is a state the boundary was never in.
+    model.advanceManual(-20);
+    expect(model.timeMillionsOfYearsProperty.value).toBe(0);
+
+    model.advanceManual(1000);
+    expect(model.timeMillionsOfYearsProperty.value).toBe(SUBDUCTION_TIME_LIMIT_MYR);
+  });
+
+  it("does nothing before a motion has been chosen", () => {
+    const model = new PlateMotionModel();
+    model.setPlate("left", "continental");
+    model.setPlate("right", "oldOceanic");
+    model.isManualModeProperty.value = true;
+
+    model.advanceManual(5);
+
+    expect(model.timeMillionsOfYearsProperty.value).toBe(0);
+  });
+
+  it("maps a drag to a rate the way PhET did: quadratic, and signed", () => {
+    // PhET's `mapDragMagnitude` is 2.5·θ² with θ reaching 0.8·π/2 at full deflection.
+    const full = MANUAL_DRAG_MAX_ANGLE_RAD;
+    expect(manualDragRateMyrPerSecond(1)).toBeCloseTo(MANUAL_DRAG_RATE_COEFFICIENT * full * full, 9);
+
+    // Quadratic, which is what makes a small pull creep and a hard pull run: halving the
+    // deflection quarters the rate.
+    expect(manualDragRateMyrPerSecond(0.5)).toBeCloseTo(manualDragRateMyrPerSecond(1) / 4, 9);
+
+    // At rest, nothing.
+    expect(manualDragRateMyrPerSecond(0)).toBe(0);
+
+    // Signed, unlike PhET's, which took the absolute value — pushing back rewinds.
+    expect(manualDragRateMyrPerSecond(-1)).toBeCloseTo(-manualDragRateMyrPerSecond(1), 9);
+
+    // Beyond full deflection the rate stops growing, so a pointer dragged off the screen
+    // cannot run 50 Myr in a frame.
+    expect(manualDragRateMyrPerSecond(40)).toBeCloseTo(manualDragRateMyrPerSecond(1), 9);
+  });
+
+  it("selects the motion a drag implies: apart is divergent, together is convergent", () => {
+    const apart = new PlateMotionModel();
+    apart.setPlate("left", "youngOceanic");
+    apart.setPlate("right", "youngOceanic");
+    expect(apart.selectMotionFromDrag(1)).toBe(true);
+    expect(apart.motionTypeProperty.value).toBe("divergent");
+
+    const together = new PlateMotionModel();
+    together.setPlate("left", "continental");
+    together.setPlate("right", "oldOceanic");
+    expect(together.selectMotionFromDrag(-1)).toBe(true);
+    expect(together.motionTypeProperty.value).toBe("convergent");
+  });
+
+  it("refuses a drag that would select a motion this pairing cannot do", () => {
+    // Two identical ocean plates have no density contrast to decide which subducts, so
+    // there is no convergent boundary to make. Pulling them together must do nothing at
+    // all rather than pick a winner — and the already-disabled radio button is what says
+    // why, so the handle needs no error surface of its own.
+    const model = new PlateMotionModel();
+    model.setPlate("left", "oldOceanic");
+    model.setPlate("right", "oldOceanic");
+
+    expect(model.selectMotionFromDrag(-1)).toBe(false);
+    expect(model.motionTypeProperty.value).toBeNull();
+    expect(model.animationStartedProperty.value).toBe(false);
+
+    // The other direction is legal, and still is after the refusal.
+    expect(model.selectMotionFromDrag(1)).toBe(true);
+    expect(model.motionTypeProperty.value).toBe("divergent");
+  });
+
+  it("does not change a motion that has already been chosen", () => {
+    // Same one-way door the radio group has: half a history of diverging plus half a
+    // history of converging is not a picture of anything.
+    const model = running();
+    expect(model.selectMotionFromDrag(1)).toBe(true);
+    expect(model.motionTypeProperty.value).toBe("convergent");
+  });
+
+  it("returns to automatic on Reset All", () => {
+    const model = running();
+    model.isManualModeProperty.value = true;
+    model.reset();
+    expect(model.isManualModeProperty.value).toBe(false);
+  });
+});
+
+describe("PlateMotionModel drop zones", () => {
+  it("places the armed piece on the side that was activated", () => {
+    // The gap this closes: the chooser used to fill the first empty side, so "old ocean
+    // on the left" and "old ocean on the right" were not both reachable.
+    const model = new PlateMotionModel();
+    model.armedPlateTypeProperty.value = "oldOceanic";
+    model.activateZone("right");
+
+    expect(model.rightPlateTypeProperty.value).toBe("oldOceanic");
+    expect(model.leftPlateTypeProperty.value).toBeNull();
+    expect(model.armedPlateTypeProperty.value).toBeNull();
+  });
+
+  it("clears a settled side when nothing is in hand", () => {
+    const model = new PlateMotionModel();
+    model.setPlate("left", "continental");
+
+    model.activateZone("left");
+
+    expect(model.leftPlateTypeProperty.value).toBeNull();
+  });
+
+  it("swaps a settled side for what is in hand", () => {
+    const model = new PlateMotionModel();
+    model.setPlate("left", "continental");
+    model.armedPlateTypeProperty.value = "youngOceanic";
+
+    model.activateZone("left");
+
+    expect(model.leftPlateTypeProperty.value).toBe("youngOceanic");
+  });
+
+  it("is inert once the boundary is running", () => {
+    const model = running();
+    model.armedPlateTypeProperty.value = "continental";
+
+    model.activateZone("left");
+
+    expect(model.leftPlateTypeProperty.value).toBe("continental");
+    expect(model.rightPlateTypeProperty.value).toBe("oldOceanic");
+  });
+
+  it("drops whatever is in hand when the boundary is cleared", () => {
+    const model = new PlateMotionModel();
+    model.armedPlateTypeProperty.value = "continental";
+    model.newCrust();
+    expect(model.armedPlateTypeProperty.value).toBeNull();
   });
 });

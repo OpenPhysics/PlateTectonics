@@ -21,6 +21,17 @@
  * that evolves, and the shape of the boundary is a pure function of it (see
  * PlateGeometry). That is what makes Rewind, step-while-paused and the time slider all
  * free, and what stops the picture depending on frame rate.
+ *
+ * ── Automatic and manual ──────────────────────────────────────────────────────
+ * In automatic mode the clock runs itself and the motion is picked from a list. In
+ * manual mode the clock does not tick at all — the user drags a handle on a plate and
+ * *that* is what advances time, which is the screen's causal story: the ridge appears
+ * because they pulled the plates apart, not because they chose the word "divergent".
+ *
+ * Manual mode does not weaken the paragraph above. A handle only moves
+ * `timeMillionsOfYearsProperty`; no geometry accumulates, and Rewind is still exact.
+ * PhET did the same thing — its `manualHandleDragTimeChange` called
+ * `clock.stepByWallSecondsForced`.
  */
 
 import type { TReadOnlyProperty } from "scenerystack/axon";
@@ -31,6 +42,8 @@ import type { ColorMode } from "../../common/model/ColorMode.js";
 import { SectionViewModel } from "../../common/model/SectionViewModel.js";
 import { TimeModel } from "../../common/TimeModel.js";
 import {
+  MANUAL_DRAG_MAX_ANGLE_RAD,
+  MANUAL_DRAG_RATE_COEFFICIENT,
   PLATE_MOTION_SPEED_RANGE,
   PLATE_MOTION_STEP_MYR,
   SUBDUCTION_TIME_LIMIT_MYR,
@@ -38,6 +51,7 @@ import {
 import {
   type BoundaryBehavior,
   behaviorFor,
+  isLegal,
   legalMotions,
   type MotionType,
   type Side,
@@ -49,12 +63,42 @@ import type { PlateType } from "./PlateType.js";
 /** Where the probe starts: in the mantle, well clear of both drop zones. */
 const PROBE_START = new Vector2(-260000, -120000);
 
+/**
+ * How fast the boundary runs while a handle is deflected by `fraction` of its travel,
+ * in millions of years per second of wall-clock time.
+ *
+ * PhET's `mapDragMagnitude`, in our units: the deflection fraction stands in for the
+ * angle its handle was tilted through, and the response is the same 2.5·θ². Quadratic, so
+ * a small pull creeps and a hard pull runs. The sign of the result is the sign of the
+ * deflection, which is what lets pushing a handle back the way it came rewind.
+ *
+ * Pure, and unit-tested in tests/PlateMotionModel.test.ts.
+ */
+export function manualDragRateMyrPerSecond(fraction: number): number {
+  if (!Number.isFinite(fraction)) {
+    return 0;
+  }
+  const clamped = Math.min(1, Math.max(-1, fraction));
+  const angle = clamped * MANUAL_DRAG_MAX_ANGLE_RAD;
+  return Math.sign(clamped) * MANUAL_DRAG_RATE_COEFFICIENT * angle * angle;
+}
+
 export class PlateMotionModel implements TModel {
   // ── The boundary ────────────────────────────────────────────────────────────
 
   /** The plate on each side, or null until one has been dropped there. */
   public readonly leftPlateTypeProperty = new Property<PlateType | null>(null);
   public readonly rightPlateTypeProperty = new Property<PlateType | null>(null);
+
+  /**
+   * The crust piece the user has picked up and not yet placed, or null.
+   *
+   * The chooser used to fill the first empty side, which meant the user could not say
+   * *which* side a piece went to — and the two drop zones drawn on the section were
+   * decoration rather than targets. Arming a piece and then activating a zone gives the
+   * choice back through every input the sim supports, pointer and keyboard alike.
+   */
+  public readonly armedPlateTypeProperty = new Property<PlateType | null>(null);
 
   /** Whether a boundary exists yet — state B. */
   public readonly hasBothPlatesProperty: TReadOnlyProperty<boolean>;
@@ -92,6 +136,15 @@ export class PlateMotionModel implements TModel {
 
   /** Millions of years per second of wall-clock time. */
   public readonly speedProperty = new NumberProperty(1, { range: PLATE_MOTION_SPEED_RANGE });
+
+  /**
+   * Whether the user is driving the boundary by hand rather than letting the clock run.
+   *
+   * PhET's `isAutoMode`, inverted so the default — automatic — is the falsy one. While
+   * this is set, `step` does not advance the reconstruction clock: the only thing that
+   * moves it is {@link advanceManual}, called by a handle being dragged.
+   */
+  public readonly isManualModeProperty = new BooleanProperty(false);
 
   // ── View state that belongs to the model ────────────────────────────────────
 
@@ -175,6 +228,89 @@ export class PlateMotionModel implements TModel {
     }
   }
 
+  /** The plate on a side, without the caller having to pick the Property. */
+  public plateAt(side: Side): PlateType | null {
+    return side === "left" ? this.leftPlateTypeProperty.value : this.rightPlateTypeProperty.value;
+  }
+
+  /**
+   * Activates one of the two drop zones.
+   *
+   * Placing what is armed if anything is, and otherwise clearing whatever is already
+   * there. One action on one target, which is what lets the same press work for a pointer
+   * and for a keyboard — and what lets a user change their mind about one side without
+   * pressing New Crust and losing the other.
+   *
+   * Refused once a motion has been chosen: the boundary is running, and swapping a plate
+   * under a history that has already happened would make the picture a composite of two.
+   */
+  public activateZone(side: Side): void {
+    if (this.animationStartedProperty.value) {
+      return;
+    }
+    const armed = this.armedPlateTypeProperty.value;
+    if (armed !== null) {
+      this.setPlate(side, armed);
+      this.armedPlateTypeProperty.value = null;
+      return;
+    }
+    if (this.plateAt(side) !== null) {
+      this.setPlate(side, null);
+    }
+  }
+
+  /**
+   * Chooses the motion a handle deflection is asking for, and reports whether it took.
+   *
+   * `outward` is positive when the handle is being pulled away from the boundary, whichever
+   * side it is on. Pulling apart is divergent; pushing together is convergent — so in
+   * manual mode the motion is selected by *doing* it rather than by naming it, which is the
+   * whole point of the mode.
+   *
+   * Returns true once a motion is settled, so a handle can go on driving the clock. Returns
+   * false when the pairing cannot do what is being asked: the drag then does nothing, and
+   * the already-disabled radio button in the boundary chooser is what explains why. One
+   * error surface rather than two.
+   */
+  public selectMotionFromDrag(outward: number): boolean {
+    if (this.motionTypeProperty.value !== null) {
+      return true;
+    }
+    const left = this.leftPlateTypeProperty.value;
+    const right = this.rightPlateTypeProperty.value;
+    if (!(left && right) || outward === 0) {
+      return false;
+    }
+
+    const wanted: MotionType = outward > 0 ? "divergent" : "convergent";
+    if (!isLegal(wanted, left, right)) {
+      return false;
+    }
+    this.motionTypeProperty.value = wanted;
+    return true;
+  }
+
+  /**
+   * Advances the reconstruction clock by a handle drag, in millions of years.
+   *
+   * Clamped at both ends: at the time limit, as the automatic clock is, and at zero, so
+   * that pushing a handle back the way it came rewinds rather than running the boundary
+   * backwards past its own beginning.
+   *
+   * Nothing accumulates here beyond the clock itself — this moves the one parameter every
+   * shape is a pure function of, which is why manual mode costs nothing in exactness.
+   */
+  public advanceManual(deltaMyr: number): void {
+    if (!(this.animationStartedProperty.value && Number.isFinite(deltaMyr))) {
+      return;
+    }
+    const limit = this.timeLimitMyrProperty.value;
+    this.timeMillionsOfYearsProperty.value = Math.min(
+      limit,
+      Math.max(0, this.timeMillionsOfYearsProperty.value + deltaMyr),
+    );
+  }
+
   /** Advances by one press of the step button, clamped to the end of the run. */
   public stepManual(): void {
     this.timeMillionsOfYearsProperty.value = Math.min(
@@ -194,6 +330,7 @@ export class PlateMotionModel implements TModel {
     this.leftPlateTypeProperty.value = null;
     this.rightPlateTypeProperty.value = null;
     this.motionTypeProperty.value = null;
+    this.armedPlateTypeProperty.value = null;
     this.animationStartedProperty.value = false;
     this.rewind();
   }
@@ -205,6 +342,13 @@ export class PlateMotionModel implements TModel {
    */
   public step(dt: number): void {
     this.timer.step(dt);
+
+    // PhET's `allowClockTickOnFrame`: in manual mode the only thing that moves the
+    // reconstruction clock is a handle. The wall-clock timer above still runs, because it
+    // is what the rest of the sim uses to pace anything not tied to the boundary.
+    if (this.isManualModeProperty.value) {
+      return;
+    }
     if (!(this.timer.isPlayingProperty.value && this.animationStartedProperty.value)) {
       return;
     }
@@ -220,6 +364,7 @@ export class PlateMotionModel implements TModel {
   /** Resets all model state to its initial values (the Reset All button). */
   public reset(): void {
     this.newCrust();
+    this.isManualModeProperty.reset();
     this.speedProperty.reset();
     this.colorModeProperty.reset();
     this.showLabelsProperty.reset();

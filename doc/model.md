@@ -322,6 +322,26 @@ beneath a block would make the block appear to float on something lighter than i
 The lookup is clamped at the table's fourth entry, the 25 km Moho (3381 kg/m³), so the
 topmost mantle value stands in for everything shallower.
 
+### What is named, and where
+
+Each shell and the user's own block carry an *extent* — a bar from the top of the range to
+its bottom with the name between them — rather than a caption floating in a band. That is
+PhET's `RangeLabelNode` and it is doing real work here: the screen is about how thick the
+middle block is and how deep it reaches, and only a bar can say either. The user's block in
+particular had no extent indicator at all, so the thickness slider had nothing to read
+against.
+
+The four shells sit at different model x so their bars do not stack in one column. The
+upper mantle's bar starts at the base of the user's crust, which is what PhET tracked — the
+mantle really does begin where that block ends, and at the crust zoom that boundary is the
+one thing on screen moving as the sliders are dragged.
+
+**"My Crust" disappears at the whole-Earth zoom.** Its three sliders act on a block that at
+that scale is thinner than the line drawn around it, so leaving them live would offer a
+control whose effect cannot be seen. PhET hid it at every zoom but the closest; it is kept
+at the lithosphere zoom here, because there the block is still a visible sliver and
+watching it change against 100 km of lithosphere is the comparison that zoom is for.
+
 ### What this screen does not claim
 
 - Isostatic adjustment here settles in about a second of view time. Real glacial
@@ -437,6 +457,40 @@ which means the volcanic arc sits inland of the trench by exactly as far as the 
 travelled sideways in reaching melting depth. This is why arcs are offset from trenches
 by a characteristic distance rather than sitting on top of them.
 
+**An arc lags its trench.** Melt does not erupt the moment the slab is deep enough: it
+rises slowly, pools at the base of the overriding crust, and only once enough has collected
+does a conduit open and a volcano start to grow. So the screen shows a chamber filling for
+millions of years before anything appears at the surface, and nothing erupts below full.
+
+| Downgoing plate | Overriding plate | Melt starts collecting | Chamber full |
+|---|---|---|---|
+| Old oceanic | continental | 18.5 Myr | 24 Myr |
+| Young oceanic | continental | 22 Myr | 26.5 Myr |
+| Old oceanic | oceanic | 18.5 Myr | 19.6 Myr |
+| Young oceanic | oceanic | 22 Myr | 22.9 Myr |
+
+The two rules behind the table are PhET's, and both are physical. Older lithosphere is
+colder, denser and dips more steeply, so it reaches the dehydration window in less
+horizontal travel and therefore sooner. And an oceanic overriding plate fills its chamber
+five times faster, because oceanic crust is a third the thickness of continental — there is
+far less of it for the melt to work through and far less cold rock to be heated on the way,
+which is why island arcs are volcanically productive on a shorter timescale than
+continental arcs.
+
+**The arc is a chain, not a ridge.** Its cones repeat every 2π × 10 km across the block and
+step sideways by 10 km in a repeating centre–left–right pattern, which is PhET's shape and
+is what makes an island arc recognisable rather than a wall. Each cone gets its own plume.
+This is the one place on the screen where the two-dimensional model is *not* simply
+extruded straight back — see the last section below.
+
+**Manual mode does not change any of this.** Whether the clock runs itself or a handle
+drives it, the boundary at time *t* is the same boundary; a handle moves *t* and nothing
+else. What manual mode changes is the claim the screen makes: the ridge appears because the
+user pulled the plates apart, rather than because they chose the word "divergent". Dragging
+a handle outward asks for a divergent boundary and inward for a convergent one, and a drag
+asking for something this pairing cannot do is refused — the same refusal the boundary
+chooser makes, by the same rule.
+
 In a collision the convergence has nowhere to go but up and down. Crust shortening to a
 fraction *f* of its width thickens by 1/*f*, conserving cross-sectional area — the model
 walks the material rather than the screen, so the conservation is exact rather than
@@ -447,25 +501,36 @@ deeper than they are high.
 
 ### What this screen does not claim
 
-- **Transform boundaries are out of scope.** Strike-slip motion is displacement into
-  the page, which a cross-section cannot show; PhET's version reduced to a rift valley
-  plus a symbol. Rather than draw a picture that does not carry the motion, the screen
-  offers only convergent and divergent boundaries and says so.
+- **Transform boundaries are not offered yet, and the old reason no longer holds.** They
+  were dropped because strike-slip motion is displacement into the page and a cross-section
+  cannot show it. That was true when both schematic screens were flat sections; the block
+  has depth, and two halves of it sliding past each other in z is exactly the picture a
+  cross-section could not draw. The risk was that the front face stops being one flat sheet
+  and the block's painter's algorithm stops being exact. It was measured against the
+  renderer and it holds — see
+  [implementation-notes.md](./implementation-notes.md#the-transform-spike) for what would
+  actually be needed. So the screen still offers only convergent and divergent, but as
+  unfinished work rather than as a claim about what a section can show, and the one piece
+  still undecided is what the *flat* view does, which genuinely cannot show the motion.
 - Plates move at a fixed 15 mm/year regardless of what is happening at the boundary.
   Real plate speeds respond to slab pull and ridge push.
 - The trench is an exponential profile fitted to look right, not a solution of plate
   flexure.
-- Magma is a single conduit at one place. Real arcs are chains of many volcanoes with
-  irregular spacing, and PhET modelled individual blobs with a Poisson process; the
-  deterministic version here looks the same and reproduces on reload.
+- The arc is one chain of evenly spaced cones fed by one chamber. Real arcs have
+  irregular spacing, several magma systems, and volcanoes that die while their neighbours
+  grow. PhET modelled the individual melt blobs with a Poisson process; the blobs here are
+  at fixed phases of the clock, which looks the same and reproduces on reload — see
+  [implementation-notes.md](./implementation-notes.md#time-as-a-pure-parameter).
 - Each boundary stops at a fixed time. That is a statement about when the process has
   finished saying what it has to say, not about when it stops in the Earth.
 - No erosion, no sedimentation, no back-arc spreading, no slab rollback.
-- **The block has no structure in the third dimension.** Everything is a
-  two-dimensional model extruded straight back, which is what a cross-section assumes:
-  the terrain does not vary front to back except for a little roughness added to high
-  ground, and the boundary is the same at the back of the block as at the front. A real
-  arc curves, a real trench is a line on a sphere, and neither is here.
+- **Only the volcanic arc has structure in the third dimension.** Everything else is a
+  two-dimensional model extruded straight back, which is what a cross-section assumes: the
+  trench, the ridge and the mountain belt are the same at the back of the block as at the
+  front, and the terrain varies front to back only by a little roughness added to high
+  ground. The arc is the exception because "a line of separate cones" is most of what an
+  island arc *is*, and a wall of rock says the opposite. A real trench is still a line on a
+  sphere, a real arc still curves, and neither of those is here.
 - **The smoke is decoration, not a model of an eruption.** Puffs are placed at fixed
   phases of the clock so that Rewind and step-while-paused stay exact; nothing about
   their size or rate is derived from the magma.

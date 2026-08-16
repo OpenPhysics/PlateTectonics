@@ -9,7 +9,7 @@
  * of register with the picture.
  */
 
-import { Multilink } from "scenerystack/axon";
+import { DerivedProperty, Multilink } from "scenerystack/axon";
 import { Bounds2 } from "scenerystack/dot";
 import { type EmptySelfOptions, optionize } from "scenerystack/phet-core";
 import { Node, Rectangle } from "scenerystack/scenery";
@@ -110,7 +110,7 @@ export class CrustScreenView extends ScreenView {
     this.block = new CrustBlockNode(model, bounds, CrustScreenView.extentFor(model.zoomProperty.value));
     this.addChild(this.block);
 
-    this.labels = new CrustLabelsNode(model, this.placement(), bounds, RELIEF_BOTTOM_M);
+    this.labels = new CrustLabelsNode(model, this.placement(), bounds);
     this.addChild(this.labels);
 
     // ── The probe ─────────────────────────────────────────────────────────────
@@ -203,6 +203,22 @@ export class CrustScreenView extends ScreenView {
       right: this.layoutBounds.maxX - SCREEN_VIEW_MARGIN,
       top: viewPanel.bottom + PANEL_SPACING,
     });
+    // "My Crust" goes away at the whole-Earth zoom, as PhET's did. Its three sliders act
+    // on a block that at that scale is thinner than the line drawn around it, so leaving
+    // them live would offer a control whose effect cannot be seen. Kept at the lithosphere
+    // zoom, where PhET also hid it: there the block is still a visible sliver and watching
+    // it change against 100 km of lithosphere is the comparison that zoom is for.
+    const crustPanelVisible = new DerivedProperty([model.zoomProperty], (zoom: CrustZoom) => zoom !== "earth");
+    crustPanel.visibleProperty = crustPanelVisible;
+
+    // The two panels below it move up to fill the space rather than leaving a hole where
+    // it was. Positions are set once at construction, so they have to be re-set here.
+    crustPanelVisible.link((visible) => {
+      viewPanel.top = visible ? crustPanel.bottom + PANEL_SPACING : bounds.minY;
+      zoomPanel.top = viewPanel.bottom + PANEL_SPACING;
+    });
+    this.disposeEmitter.addListener(() => crustPanelVisible.dispose());
+
     this.addChild(crustPanel);
     this.addChild(viewPanel);
     this.addChild(zoomPanel);

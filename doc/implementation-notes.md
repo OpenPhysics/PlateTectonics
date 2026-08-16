@@ -423,6 +423,39 @@ changes and hands the same one to everything.
 constant elevation is a horizontal line when flat and an arc on the block, and drawing
 sea level as a chord would put the horizon under the ocean.
 
+Five kinds of thing go through it:
+
+```
+common/view/  RangeLabelNode.ts     an extent: two model points, a bar, a name between them
+              BoundaryLineNode.ts   a dotted line along a surface, with an x window
+              EarthProbeNode.ts     the temperature/density probe
+              SectionRulerNode.ts   the ruler
+plate-motion/view/  PlateHandleNode.ts   the manual-mode drag handle
+```
+
+`RangeLabelNode` is a measurement rather than a caption, and that distinction is the
+reason it exists. A word floating in a band says which rock it is; a bar from the top of
+the range to its bottom says *where the range starts and stops*, which on the Crust screen
+is the quantity the thickness slider changes and on Plate Motion is the only thing telling
+the crust apart from the lithosphere it rides on. Two things about it are load-bearing:
+
+- **The label is centred in the visible part of the range, not between its two ends.**
+  A range whose base is off the bottom of the picture — the whole-Earth zoom's core, any
+  shell on a stretched block — would otherwise put its name where nobody can read it. This
+  is PhET's `getLabelPosition`, and `rangeLabelLayout` is a pure function so it can be
+  tested rather than eyeballed.
+- **A range too short to hold its name collapses** to a leader line out to the side rather
+  than being dropped. That is what lets a 6 km oceanic crust still be named on a section
+  300 km deep — the case the old "skip anything under 18 px" rule silently lost.
+
+The bar is clipped to the viewport and the name is not: the name has already been pulled
+inside, while an unclipped leg runs across the legend and the navigation bar below.
+
+Overlapping ranges are put at different model x. A plate's crust and its lithosphere share
+a top edge and differ only in where they end, so two bars at the same x would be drawn one
+over the other; PhET staggered them at ⅙ and ⅓ of the way out from the boundary and that
+is kept. The Crust screen staggers its four shells the same way.
+
 ### The tools
 
 The original's thermometer and density meter remain merged into one `EarthProbeNode`
@@ -437,16 +470,110 @@ own position — both ends projected on every move, setting its pixel length and
 which is exact at the ends and wrong by well under a tick in between, in exchange for
 keeping its numbers as real text.
 
+### Building the boundary
+
+Before anything can move there has to be a plate on each side, and the two ways of putting
+one there end at the same call, `PlateMotionModel.activateZone( side )`.
+
+A press on a crust piece **picks it up** — `armedPlateTypeProperty` — and a press on a drop
+zone hands it over. The chooser used to fill the first empty side instead, which meant the
+user could not say *which* side a plate went to; a boundary is a comparison between two
+sides, so "old ocean on the left" and "old ocean on the right" are not the same experiment.
+The same two presses now say which. A zone pressed with nothing in hand clears whatever is
+already there, so one side can be changed without New Crust taking the other with it.
+
+A piece can also be **dragged straight into a zone**, which is what PhET had and what the
+piece looks like it wants. It is a shortcut through those two steps rather than a second
+mechanism: leaving the piece arms it, so the zones light up exactly as a click would, and
+releasing over a zone activates that zone. Two consequences worth knowing:
+
+- **A drag released short of a zone leaves the piece in hand**, so a miss degrades into the
+  press path instead of dropping what was picked up.
+- **The push button and the drag stay out of each other's way by a distance threshold.**
+  Below it nothing has happened and the button fires as usual; past it the drag takes over
+  and interrupts the button, so one press cannot both drop the piece and toggle it back
+  out of hand. The drag listener is deliberately unattached to the pointer — the button
+  underneath claims it first, and that button is the whole keyboard path.
+
+`dropZoneBounds` is a pure function of the placement, so *which* side a release lands on is
+unit-tested in both views rather than eyeballed in one. Everything else about a zone —
+where it is, how it highlights, whether it is still a target — follows the section it is
+drawn on, which is why the chooser is handed a `CrustDropTarget` by the screen instead of
+working any of it out itself.
+
+### Manual mode
+
+`PlateHandleNode` is a handle standing on each plate; dragging one is what advances the
+clock, and the direction of the drag is what *chooses* the boundary type. That is the
+screen's causal story — the ridge appears because the user pulled the plates apart, not
+because they picked the word "divergent" off a list — and it is why PhET made manual the
+default mode rather than an extra.
+
+**It does not weaken time-as-a-pure-parameter.** A handle moves
+`timeMillionsOfYearsProperty` and nothing else; every shape is still a pure function of
+it, so Rewind and step-while-paused stay exact. PhET's `manualHandleDragTimeChange` called
+`clock.stepByWallSecondsForced` for the same reason.
+
+Three pieces, and the split is deliberate:
+
+- `PlateMotionModel.isManualModeProperty` — while it is set, `step` does not advance the
+  reconstruction clock at all. PhET's `allowClockTickOnFrame`.
+- `PlateMotionModel.selectMotionFromDrag` — *which* motion a deflection means, and whether
+  this pairing can do it. In the model, not the handle, so it is unit-tested with the rest
+  of the state machine. A drag that would select an illegal motion is refused and the
+  already-disabled radio button is what explains why; the handle grows no error surface of
+  its own.
+- `manualDragRateMyrPerSecond` — PhET's `mapDragMagnitude`, `2.5·θ²`, with the handle's
+  deflection fraction standing in for the angle its handle was tilted through. Quadratic,
+  so a small pull creeps and a hard pull runs.
+
+One divergence: PhET took the absolute value of the rate, so a handle pushed *back* still
+ran the boundary forwards. Here the sign is kept, which makes the handle a scrub control
+as well as a throttle and gives the arrow keys on a focused handle something a keyboard
+user would expect. It costs nothing — the clock is a parameter, so running it backwards is
+exact.
+
+Being held out is a *duration*, not an event, so it has no Property change to hang itself
+on; `PlateMotionScreenView.step` is what advances the clock while a handle is held.
+
 ### Still not ported
 
-- **Transform boundaries.** The motion is into the page, and the block is a
-  two-dimensional model extruded straight back, so it cannot show them either. The screen
-  offers convergent and divergent only and `doc/model.md` says why.
-- **Manual drag-the-plates mode.** The automatic mode reaches the same states, and the
-  drag handles would need redesigning rather than porting.
+- **Transform boundaries.** Not for the reason they used to be — see the spike below.
 - **A toolbox.** The probe and the ruler are always on screen, which is what the probe
   already did; adding a place for them to hide would be a new affordance rather than a
   restored one.
+
+### The transform spike
+
+The documented reason for dropping transform boundaries was that strike-slip motion is
+displacement into the page and a cross-section cannot show it. That was true when both
+schematic screens were flat sections. The block has depth, so two halves of it sliding
+past each other in z is precisely the picture a cross-section could not draw — better than
+PhET's own version, which reduced to a rift valley plus arrows. The argument had to be
+re-run, and the risk named was that the front face stops being one flat sheet and
+`QuadRenderer`'s painter's algorithm stops holding.
+
+**It holds.** Measured against the real renderer:
+
+- Two section halves on *different* z planes are ordered correctly by depth. The sort is
+  by mean projected depth within a layer, and two parallel planes never tie.
+- `BLOCK_LAYER` needs no new groups. Its sub-orders are per *material* — mantle, slab,
+  lithosphere, crust — not per side, so both halves' crust go in one layer and depth
+  separates them. The trap is the opposite: giving each half its own sub-layer would make
+  layer beat depth and paint the far half over the near one.
+- Neither half interpenetrates the other, so the algorithm stays exact.
+
+What transform would actually need is therefore *not* a renderer redesign:
+
+- a z offset per side on `BoundaryGeometry`, left at zero by every other behaviour;
+- terrain emitted as two heightfields rather than one, with two new wall faces along the
+  fault — which is the fault scarp, and the whole point of the picture;
+- the mantle backdrop emitted per half rather than as one band across the section;
+- `SceneCamera.framing` given the offset corners. At ±40 km a pulled corner still lands
+  inside the viewport, but the framing points are the block's extent and would be wrong.
+
+So the gate the plan set is open, and `doc/model.md` records the decision. The remaining
+undecided piece is what the *flat* section does, which genuinely cannot show the motion.
 
 ## Naming around the Node API
 

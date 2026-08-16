@@ -36,8 +36,15 @@
 
 import { Vector2 } from "scenerystack/dot";
 import {
+  ARC_X_DECAY_M,
+  ARC_X_OFFSET_M,
+  ARC_Z_PERIOD_FACTOR_M,
   COLLISION_ELEVATION_RANGE_M,
-  MELT_SPEED_M_PER_MYR,
+  MAGMA_FILL_END_OLD_MYR,
+  MAGMA_FILL_END_YOUNG_MYR,
+  MAGMA_FILL_OCEANIC_SPEEDUP,
+  MAGMA_FILL_START_OLD_MYR,
+  MAGMA_FILL_START_YOUNG_MYR,
   MELT_TOP_DEPTH_M,
   NEW_CRUST_LABEL_DELAY_MYR,
   PLATE_SPEED_M_PER_MYR,
@@ -69,6 +76,37 @@ export type Volcano = {
   readonly heightM: number;
 };
 
+/**
+ * A blob of melt on its way up off the slab.
+ *
+ * PhET released these from a Poisson process. Here each is a fixed phase of the clock, for
+ * the reason the whole screen is built that way: nothing may accumulate, or Rewind and
+ * step-while-paused stop being exact. Blobs at fixed phases repeat instead of being
+ * individually random, which at this size is not a difference anyone can see.
+ */
+export type MagmaBlob = {
+  readonly xM: number;
+  readonly elevationM: number;
+  readonly radiusM: number;
+
+  /** 1 where the blob was made, falling to 0 as it is absorbed into the chamber. */
+  readonly opacity: number;
+};
+
+/**
+ * One cone of the volcanic arc, placed across the block as well as along the section.
+ *
+ * `zM` is 0 at the cut face and negative into the block. A real arc is a line of cones,
+ * and putting them at different z is the only way a cross-section-plus-extrusion can say
+ * so — which is what {@link arcCones} and {@link arcRiseM} exist for.
+ */
+export type ArcCone = {
+  readonly xM: number;
+  readonly zM: number;
+  readonly baseM: number;
+  readonly heightM: number;
+};
+
 /** Everything the painter needs for one moment of one boundary. */
 export type BoundaryGeometry = {
   readonly left: PlateOutline;
@@ -80,11 +118,43 @@ export type BoundaryGeometry = {
   /** Half-thickness of the slab, m — it is drawn as a ribbon about its centreline. */
   readonly slabHalfThicknessM: number;
 
-  /** Outline of the magma that has collected under the arc, or empty when there is none. */
+  /**
+   * Outline of the chamber the melt has collected in, or empty when there is none.
+   *
+   * The chamber appears as soon as the slab reaches the dehydration window and grows as it
+   * fills; the conduit is a separate shape that only exists once it is full.
+   */
   readonly magma: readonly Vector2[];
 
-  /** Volcanoes built on the overriding plate. */
+  /** The column from the full chamber to the surface, or empty until the chamber is full. */
+  readonly magmaConduit: readonly Vector2[];
+
+  /** Melt rising off the slab towards the chamber. */
+  readonly magmaBlobs: readonly MagmaBlob[];
+
+  /**
+   * How full the chamber is, 0 to 1. Nothing erupts below 1.
+   *
+   * Exposed rather than kept private because it is the screen's answer to "why is nothing
+   * happening yet", and the view has to be able to say so.
+   */
+  readonly chamberFullness: number;
+
+  /**
+   * Volcanoes built on the overriding plate, on the cut face.
+   *
+   * The arc is a chain across the block; these are the cones the *section* passes through.
+   * {@link arcCones} gives the rest.
+   */
   readonly volcanoes: readonly Volcano[];
+
+  /**
+   * Which way the slab is going, as a sign on x, or 0 when nothing is subducting.
+   *
+   * The arc's cones step sideways in a pattern that is mirrored with the subduction, so
+   * the chain leans the same way relative to the trench whichever side goes down.
+   */
+  readonly downSign: number;
 
   /** Model x of the spreading axis, or null when this is not a rift. */
   readonly ridgeAxisM: number | null;
@@ -118,6 +188,284 @@ const COLLISION_REACH_M = 260000;
  * why a mountain range has a root about five times deeper than it is high.
  */
 const COLLISION_ROOT_SHARE = 5 / 6;
+
+/**
+ * Elevation of a polyline at a given x, by linear interpolation; clamped outside it.
+ *
+ * A plate's three polylines are each a function of x, but they run in whichever direction
+ * the behaviour that produced them happened to walk — see {@link PlateOutline} — so the
+ * ends are found by value rather than by index. Everything that has to read a layer
+ * boundary as a depth goes through this: the block's end walls, and every label pinned to
+ * one.
+ */
+export function elevationAtX(profile: readonly Vector2[], xM: number): number {
+  if (profile.length === 0) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  let low = profile[0];
+  let high = profile[0];
+  for (const point of profile) {
+    if (!low || point.x < low.x) {
+      low = point;
+    }
+    if (!high || point.x > high.x) {
+      high = point;
+    }
+  }
+  if (!(low && high)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  if (xM <= low.x) {
+    return low.y;
+  }
+  if (xM >= high.x) {
+    return high.y;
+  }
+
+  // The bracketing pair, found by value for the same reason. Interpolated rather than
+  // snapped to the nearer sample: a collision samples the crust base forty times across
+  // 700 km, so a nearest-sample read is out by up to 9 km of x, which on a thickening
+  // root is hundreds of metres of depth.
+  let before = low;
+  let after = high;
+  for (const point of profile) {
+    if (point.x <= xM && point.x >= before.x) {
+      before = point;
+    }
+    if (point.x >= xM && point.x <= after.x) {
+      after = point;
+    }
+  }
+  const span = after.x - before.x;
+  return span === 0 ? before.y : before.y + ((after.y - before.y) * (xM - before.x)) / span;
+}
+
+// ── The magma chamber and the arc ─────────────────────────────────────────────
+
+/** Half-width and height of a completely full magma chamber, m. */
+const CHAMBER_MAX_HALF_WIDTH_M = 26000;
+const CHAMBER_MAX_HEIGHT_M = 14000;
+
+/** How big an empty chamber is drawn, as a fraction of a full one. */
+const CHAMBER_MIN_SIZE = 0.25;
+
+/** Half-widths of the conduit where it leaves the chamber and where it reaches the summit, m. */
+const CONDUIT_BASE_HALF_WIDTH_M = 6000;
+const CONDUIT_TOP_HALF_WIDTH_M = 1500;
+
+/** Tallest an arc volcano grows, m, and how fast it gets there. */
+const ARC_MAX_HEIGHT_M = 4000;
+const ARC_GROWTH_M_PER_MYR = 320;
+
+/** How many blobs are on their way up off the slab at once, and their size. */
+const BLOB_COUNT = 4;
+const BLOB_RADIUS_M = 3500;
+
+/** How long one blob takes to travel from the melt source to the chamber, Myr. */
+const BLOB_PERIOD_MYR = 2.4;
+
+/** Points a chamber outline is drawn with. Enough that it reads as a blob, not a polygon. */
+const ELLIPSE_POINTS = 16;
+
+/** When the chamber under the arc starts and finishes filling, Myr. */
+function chamberWindow(down: PlateType, over: PlateType): { startMyr: number; endMyr: number } {
+  const young = down === "youngOceanic";
+  const startMyr = young ? MAGMA_FILL_START_YOUNG_MYR : MAGMA_FILL_START_OLD_MYR;
+  const fullMyr = young ? MAGMA_FILL_END_YOUNG_MYR : MAGMA_FILL_END_OLD_MYR;
+
+  // Under thin oceanic crust the melt has far less to get through, so the same chamber
+  // fills in a fifth of the time. PhET's factor, applied to the *span* rather than to the
+  // start: the melt does not arrive any sooner, it just accumulates faster once it does.
+  const spanMyr = (fullMyr - startMyr) / (plateProperties(over).isOceanic ? MAGMA_FILL_OCEANIC_SPEEDUP : 1);
+  return { startMyr, endMyr: startMyr + spanMyr };
+}
+
+/** When the chamber under this pairing's arc is full, Myr. */
+export function chamberFullAtMyr(down: PlateType, over: PlateType): number {
+  return chamberWindow(down, over).endMyr;
+}
+
+/**
+ * How full the chamber under the arc is at `tMyr`, 0 to 1.
+ *
+ * The screen's answer to "why is there a slab but no volcano yet". Nothing erupts below 1.
+ */
+export function chamberFullness(down: PlateType, over: PlateType, tMyr: number): number {
+  const { startMyr, endMyr } = chamberWindow(down, over);
+  if (tMyr <= startMyr) {
+    return 0;
+  }
+  if (tMyr >= endMyr) {
+    return 1;
+  }
+  return (tMyr - startMyr) / (endMyr - startMyr);
+}
+
+/** An ellipse as a closed polygon, for the chamber and the blobs. */
+function ellipse(centreXM: number, centreYM: number, halfWidthM: number, halfHeightM: number): Vector2[] {
+  const points: Vector2[] = [];
+  for (let i = 0; i < ELLIPSE_POINTS; i++) {
+    const angle = (i / ELLIPSE_POINTS) * 2 * Math.PI;
+    points.push(new Vector2(centreXM + halfWidthM * Math.cos(angle), centreYM + halfHeightM * Math.sin(angle)));
+  }
+  return points;
+}
+
+/**
+ * Blobs of melt between the slab and the chamber.
+ *
+ * Each is at a fixed phase of the clock, so replaying the same instant gives the same
+ * blobs in the same places — the deterministic stand-in for PhET's Poisson arrivals. They
+ * fade as they arrive, so the chamber reads as being fed rather than as having a queue of
+ * objects bumping into it.
+ */
+function risingBlobs(xM: number, sourceM: number, chamberBaseM: number, tMyr: number): MagmaBlob[] {
+  const blobs: MagmaBlob[] = [];
+  const riseM = chamberBaseM - sourceM;
+  if (riseM <= 0) {
+    return blobs;
+  }
+
+  for (let index = 0; index < BLOB_COUNT; index++) {
+    const phase = (tMyr / BLOB_PERIOD_MYR + index / BLOB_COUNT) % 1;
+    blobs.push({
+      xM,
+      elevationM: sourceM + phase * riseM,
+      radiusM: BLOB_RADIUS_M,
+      // Full for most of the climb, fading over the last quarter of it.
+      opacity: Math.min(1, (1 - phase) * 4),
+    });
+  }
+  return blobs;
+}
+
+/**
+ * How far the arc's cone at `zM` is stepped sideways from the melt source, m.
+ *
+ * PhET's modulo-3 stagger. Neighbouring cones sit at the centre, then one side, then the
+ * other, which is what turns a ridge into a chain — a straight row of identical cones
+ * reads as an extruded triangle, and a real arc is neither straight nor evenly spaced.
+ */
+function arcConeOffsetM(zM: number, downSign: number): number {
+  const theta = zM / ARC_Z_PERIOD_FACTOR_M;
+  // The half turn is where the cones are; the +0.5 puts the switch between bands in the
+  // valleys between them rather than on a summit, which is PhET's own comment.
+  const band = Math.floor(Math.abs(theta / Math.PI) + 0.5) % 3;
+  if (band === 0) {
+    return 0;
+  }
+  return downSign * ARC_X_OFFSET_M * (band === 1 ? 1 : -1);
+}
+
+/**
+ * How much the volcanic arc raises the ground at a point on the block's top surface, m.
+ *
+ * Zero everywhere except near the arc, which is deliberate as well as cheap: the two-
+ * dimensional model extruded straight back is the right picture for a trench and for a
+ * mountain belt, and the arc is the one feature where it is wrong. Restricting the z
+ * variation to a window in x is also what keeps this affordable — the block resamples its
+ * whole terrain grid every frame while the clock runs.
+ */
+export function arcRiseM(geometry: BoundaryGeometry, xM: number, zM: number): number {
+  const volcano = geometry.volcanoes[0];
+  if (!volcano || volcano.heightM <= 0) {
+    return 0;
+  }
+  if (Math.abs(xM - volcano.xM) > ARC_WINDOW_M) {
+    return 0;
+  }
+
+  // Cubed, as PhET had it, so the cones are separated by real flat ground rather than by
+  // a gentle undulation — the gaps are what make it read as a chain of islands.
+  const upDown = (Math.cos(zM / ARC_Z_PERIOD_FACTOR_M) + 1) / 2;
+  const centreXM = volcano.xM - arcConeOffsetM(zM, geometry.downSign);
+  return volcano.heightM * upDown ** 3 * Math.exp(-Math.abs(xM - centreXM) / ARC_X_DECAY_M);
+}
+
+/**
+ * The summits of the arc's cones between `minZM` and the cut face.
+ *
+ * Where `arcRiseM` is maximal in z, which is every 2π of its cosine. The view puts a smoke
+ * plume on each of them, which is the difference between one erupting volcano and an
+ * erupting arc.
+ */
+export function arcCones(geometry: BoundaryGeometry, minZM: number): ArcCone[] {
+  const volcano = geometry.volcanoes[0];
+  if (!volcano || volcano.heightM <= 0) {
+    return [];
+  }
+
+  const periodM = 2 * Math.PI * ARC_Z_PERIOD_FACTOR_M;
+  const cones: ArcCone[] = [];
+  for (let index = 0; ; index++) {
+    const zM = -index * periodM;
+    if (zM < minZM) {
+      break;
+    }
+    cones.push({
+      xM: volcano.xM - arcConeOffsetM(zM, geometry.downSign),
+      zM,
+      baseM: volcano.baseM,
+      heightM: volcano.heightM,
+    });
+  }
+  return cones;
+}
+
+/** How far either side of the arc the ground is allowed to vary with z, m. */
+const ARC_WINDOW_M = 6 * ARC_X_DECAY_M;
+
+/** Samples across the arc's cross-section, and how wide that section reaches. */
+const ARC_SECTION_SAMPLES = 24;
+export const ARC_SECTION_HALF_WIDTH_M = 3 * ARC_X_DECAY_M;
+
+/**
+ * The shape of a cut through an arc volcano, in its own units.
+ *
+ * `u` runs −1 to 1 across the cone and `h` is 0 at its foot and 1 at its summit, so both
+ * views can draw the same cone in the proportions each of them is honest about.
+ *
+ * They need different proportions, and this is why the shape is shared rather than the
+ * geometry. On the block, x and elevation are the same scale (up to the exaggeration
+ * slider), so the cone is drawn in true metres — and it has to be, because the same
+ * profile is what the terrain grid is built from and any disagreement shows as a sliver of
+ * sky along the cone's flanks. The flat section magnifies its shallow band about thirty
+ * times against x, so a cone drawn there in true metres is a needle; it scales the same
+ * shape to a legible width in pixels instead, exactly as it does for nothing else, because
+ * nothing else on that view is this steep.
+ *
+ * The falloff is `exp(−3|u|)`, which is {@link arcRiseM}'s own decay over
+ * {@link ARC_SECTION_HALF_WIDTH_M} — so on the block the two agree exactly.
+ */
+export function arcSectionShape(): { readonly u: number; readonly h: number }[] {
+  const decayPerHalfWidth = ARC_SECTION_HALF_WIDTH_M / ARC_X_DECAY_M;
+  const points: { u: number; h: number }[] = [];
+  for (let i = 0; i <= ARC_SECTION_SAMPLES; i++) {
+    const u = -1 + (2 * i) / ARC_SECTION_SAMPLES;
+    points.push({ u, h: Math.exp(-decayPerHalfWidth * Math.abs(u)) });
+  }
+  return points;
+}
+
+/**
+ * The arc's cross-section on the block's cut face, as a closed polygon on its base.
+ *
+ * In true model metres, which is what the block wants: the cone drawn on the section is
+ * then exactly the cut through the cone standing on the terrain beside it.
+ */
+export function arcSectionProfile(volcano: {
+  readonly xM: number;
+  readonly baseM: number;
+  readonly heightM: number;
+}): Vector2[] {
+  const points = arcSectionShape().map(
+    ({ u, h }) => new Vector2(volcano.xM + u * ARC_SECTION_HALF_WIDTH_M, volcano.baseM + h * volcano.heightM),
+  );
+  points.push(new Vector2(volcano.xM + ARC_SECTION_HALF_WIDTH_M, volcano.baseM));
+  points.push(new Vector2(volcano.xM - ARC_SECTION_HALF_WIDTH_M, volcano.baseM));
+  return points;
+}
 
 /** A flat plate outline spanning [x0, x1] at its rest elevations. */
 function flatOutline(type: PlateType, x0M: number, x1M: number): PlateOutline {
@@ -183,7 +531,11 @@ function riftingGeometry(left: PlateType, right: PlateType, tMyr: number): Bound
     slab: [],
     slabHalfThicknessM: 0,
     magma: [],
+    magmaConduit: [],
+    magmaBlobs: [],
+    chamberFullness: 0,
     volcanoes: [],
+    downSign: 0,
     ridgeAxisM: 0,
     newCrustHalfWidthM: openingM,
     hasNewCrust: tMyr > NEW_CRUST_LABEL_DELAY_MYR,
@@ -235,38 +587,54 @@ function subductionGeometry(left: PlateType, right: PlateType, down: "left" | "r
   // vertically. Its horizontal offset from the trench is therefore set by how far the
   // slab has moved sideways by the time it is that deep — which is why arcs sit a
   // characteristic distance inland and not at the trench itself.
+  //
+  // What happens then is a sequence, not an event. Melt rises off the slab as blobs,
+  // pools at the base of the overriding crust, and only once enough has collected does a
+  // conduit open and a volcano start to grow. The waiting is the claim: an arc lags its
+  // trench by millions of years.
   const meltTopS = curve.lengthAtDepth(MELT_TOP_DEPTH_M);
   const reachedMelt = meltTopS !== null && travelledM > meltTopS;
 
   let magma: Vector2[] = [];
+  let magmaConduit: Vector2[] = [];
+  let magmaBlobs: MagmaBlob[] = [];
   let volcanoes: Volcano[] = [];
+  const fullness = chamberFullness(downType, overType, tMyr);
 
   if (reachedMelt && meltTopS !== null) {
     const sourceM = mirror(curve.positionAt(meltTopS));
     const arcXM = sourceM.x;
-
-    // How far the melt has risen since it was first generated. Melt is buoyant, so it
-    // goes straight up from where it was made — it does not follow the slab down.
-    const risenM = Math.max(0, (travelledM - meltTopS) / PLATE_SPEED_M_PER_MYR) * MELT_SPEED_M_PER_MYR;
     const overTopM = plateProperties(overType).crustTopM;
-    const chamberTopM = Math.min(overTopM, sourceM.y + risenM);
-    const baseHalfWidthM = 22000;
+    const overBaseM = plateProperties(overType).crustBaseM;
 
-    // A vertical conduit that tapers upwards: wide where the melt is being collected off
-    // the slab, narrow where it is being funnelled into the crust above.
-    magma = [
-      new Vector2(arcXM - baseHalfWidthM * 0.3, chamberTopM),
-      new Vector2(arcXM + baseHalfWidthM * 0.3, chamberTopM),
-      new Vector2(arcXM + baseHalfWidthM, sourceM.y),
-      new Vector2(arcXM - baseHalfWidthM, sourceM.y),
-    ];
+    // The chamber sits at the base of the overriding crust, which is where rising melt
+    // stops: it is buoyant relative to the mantle it came from but not relative to the
+    // crust above, so it ponds at the interface. It widens as it fills.
+    const chamberHalfWidthM = CHAMBER_MAX_HALF_WIDTH_M * (CHAMBER_MIN_SIZE + (1 - CHAMBER_MIN_SIZE) * fullness);
+    const chamberHeightM = CHAMBER_MAX_HEIGHT_M * (CHAMBER_MIN_SIZE + (1 - CHAMBER_MIN_SIZE) * fullness);
+    magma = ellipse(arcXM, overBaseM - chamberHeightM / 2, chamberHalfWidthM, chamberHeightM / 2);
 
-    // Once the melt has reached the base of the overriding crust, it starts building
-    // a volcano rather than continuing to rise as a chamber.
-    const brokeThrough = sourceM.y + risenM - plateProperties(overType).crustBaseM;
-    if (brokeThrough > 0) {
-      const heightM = Math.min(4000, brokeThrough / 12);
+    // Blobs on their way from the slab to the chamber, at fixed phases of the clock.
+    magmaBlobs = risingBlobs(arcXM, sourceM.y, overBaseM - chamberHeightM, tMyr);
+
+    if (fullness >= 1) {
+      // The conduit opens, and the volcano grows from the moment it does. Height is a
+      // function of how long it has been erupting, not of how far the melt has risen —
+      // the rising is over.
+      const eruptingMyr = tMyr - chamberFullAtMyr(downType, overType);
+      const heightM = Math.min(ARC_MAX_HEIGHT_M, eruptingMyr * ARC_GROWTH_M_PER_MYR);
       volcanoes = [{ xM: arcXM, baseM: overTopM, heightM }];
+
+      // Tapering upwards, and tracking the summit rather than stopping at the ground: the
+      // conduit is what feeds the cone, and one that stopped at the old ground level would
+      // leave the cone sitting on nothing as it grew.
+      const summitM = overTopM + heightM;
+      magmaConduit = [
+        new Vector2(arcXM - CONDUIT_TOP_HALF_WIDTH_M, summitM),
+        new Vector2(arcXM + CONDUIT_TOP_HALF_WIDTH_M, summitM),
+        new Vector2(arcXM + CONDUIT_BASE_HALF_WIDTH_M, overBaseM - chamberHeightM / 2),
+        new Vector2(arcXM - CONDUIT_BASE_HALF_WIDTH_M, overBaseM - chamberHeightM / 2),
+      ];
     }
   }
 
@@ -286,7 +654,11 @@ function subductionGeometry(left: PlateType, right: PlateType, down: "left" | "r
     slab,
     slabHalfThicknessM: (crustThickness(downType) + plateProperties(downType).mantleLithosphereM) / 2,
     magma,
+    magmaConduit,
+    magmaBlobs,
+    chamberFullness: fullness,
     volcanoes,
+    downSign,
     ridgeAxisM: null,
     newCrustHalfWidthM: 0,
     hasNewCrust: false,
@@ -362,7 +734,11 @@ function collisionGeometry(left: PlateType, right: PlateType, tMyr: number): Bou
     slab: [],
     slabHalfThicknessM: 0,
     magma: [],
+    magmaConduit: [],
+    magmaBlobs: [],
+    chamberFullness: 0,
     volcanoes: [],
+    downSign: 0,
     ridgeAxisM: null,
     newCrustHalfWidthM: 0,
     hasNewCrust: false,
@@ -377,7 +753,11 @@ export function restingGeometry(left: PlateType, right: PlateType): BoundaryGeom
     slab: [],
     slabHalfThicknessM: 0,
     magma: [],
+    magmaConduit: [],
+    magmaBlobs: [],
+    chamberFullness: 0,
     volcanoes: [],
+    downSign: 0,
     ridgeAxisM: null,
     newCrustHalfWidthM: 0,
     hasNewCrust: false,

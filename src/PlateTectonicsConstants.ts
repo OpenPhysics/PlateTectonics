@@ -405,6 +405,47 @@ export const MELT_BOTTOM_DEPTH_M = 150000;
 /** Speed magma rises through the overriding plate, m per million years. */
 export const MELT_SPEED_M_PER_MYR = 10000;
 
+/**
+ * When the magma chamber under a volcanic arc starts and finishes filling, Myr.
+ *
+ * Arcs do not erupt the moment a slab reaches melting depth. Melt is generated slowly,
+ * rises slowly, and pools at the base of the overriding crust for millions of years before
+ * enough has collected to break through — so a trench and a slab appear long before the
+ * first volcano does, and the delay is part of what a subduction zone *is*.
+ *
+ * PhET's numbers, from `OverridingBehavior.getChamberFullness`: an old downgoing plate
+ * starts feeding melt sooner than a young one, because it is colder, denser and therefore
+ * descends more steeply and reaches the dehydration window in less horizontal travel.
+ */
+export const MAGMA_FILL_START_OLD_MYR = 18.5;
+export const MAGMA_FILL_END_OLD_MYR = 24;
+export const MAGMA_FILL_START_YOUNG_MYR = 22;
+export const MAGMA_FILL_END_YOUNG_MYR = 26.5;
+
+/**
+ * How much faster the chamber fills when the overriding plate is oceanic.
+ *
+ * PhET's factor of five. Oceanic crust is a third the thickness of continental crust, so
+ * there is far less of it for the melt to work its way through and far less cold rock to
+ * be heated on the way — which is why island arcs are volcanically productive on a shorter
+ * timescale than continental arcs.
+ */
+export const MAGMA_FILL_OCEANIC_SPEEDUP = 5;
+
+/**
+ * The shape of the volcanic arc across the block.
+ *
+ * An arc is a *chain*, not a ridge: a line of separate cones, offset from one another
+ * rather than in a straight row, which is the shape that makes an island arc recognisable
+ * on a map. PhET built it by modulating the terrain with a cosine in z and stepping the
+ * cone's x by a modulo-3 pattern, and these are its numbers — the z period factor (the
+ * cones repeat every 2π times this), the sideways step between neighbouring cones, and
+ * how quickly one cone's flank falls away in x.
+ */
+export const ARC_Z_PERIOD_FACTOR_M = 10000;
+export const ARC_X_OFFSET_M = 10000;
+export const ARC_X_DECAY_M = 10000;
+
 /** Elevation of the crest of a spreading ridge, m. */
 export const RIDGE_TOP_M = -500;
 
@@ -446,6 +487,22 @@ export const PLATE_MOTION_SPEED_RANGE = new Range(0.1, 10);
 
 /** One press of the step button on the Plate Motion screen, Myr. */
 export const PLATE_MOTION_STEP_MYR = 5;
+
+/**
+ * How fast a fully deflected drag handle runs the boundary, and how the rate grows.
+ *
+ * PhET drove manual mode from the angle it had tilted the handle through, at
+ * `rate = 2.5·θ²` million years per wall-clock second, with `θ` reaching 0.8·π/2 at full
+ * deflection — about 3.9 Myr/s, which is roughly four times the automatic clock's default
+ * speed. The quadratic is the part that matters: it makes a small pull creep and a hard
+ * pull run, so the same control does both careful inspection and getting to the end.
+ *
+ * Kept in these terms rather than rewritten as a peak rate, so the shape of the response
+ * is PhET's and not a new invention; the handle supplies a deflection fraction in [−1, 1]
+ * measured against its own travel in the viewport, which is what replaces Java's pixels.
+ */
+export const MANUAL_DRAG_RATE_COEFFICIENT = 2.5;
+export const MANUAL_DRAG_MAX_ANGLE_RAD = 0.8 * (Math.PI / 2);
 
 PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   SCREEN_VIEW_MARGIN,
@@ -549,6 +606,14 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   MELT_TOP_DEPTH_M,
   MELT_BOTTOM_DEPTH_M,
   MELT_SPEED_M_PER_MYR,
+  MAGMA_FILL_START_OLD_MYR,
+  MAGMA_FILL_END_OLD_MYR,
+  MAGMA_FILL_START_YOUNG_MYR,
+  MAGMA_FILL_END_YOUNG_MYR,
+  MAGMA_FILL_OCEANIC_SPEEDUP,
+  ARC_Z_PERIOD_FACTOR_M,
+  ARC_X_OFFSET_M,
+  ARC_X_DECAY_M,
   RIDGE_TOP_M,
   NEW_CRUST_LABEL_DELAY_MYR,
   COLLISION_ELEVATION_RANGE_M,
@@ -564,4 +629,6 @@ PlateTectonicsNamespace.register("PlateTectonicsConstants", {
   SUBDUCTION_TIME_LIMIT_MYR,
   PLATE_MOTION_SPEED_RANGE,
   PLATE_MOTION_STEP_MYR,
+  MANUAL_DRAG_RATE_COEFFICIENT,
+  MANUAL_DRAG_MAX_ANGLE_RAD,
 });

@@ -24,13 +24,22 @@ import {
   SLAB_DENSITY_KG_M3,
   SURFACE_TEMPERATURE_K,
 } from "../../PlateTectonicsConstants.js";
-import { boundaryGeometry, type PlateOutline } from "../model/PlateGeometry.js";
+import { arcSectionShape, boundaryGeometry, type PlateOutline } from "../model/PlateGeometry.js";
 import type { PlateMotionModel } from "../model/PlateMotionModel.js";
 import { simpleMantleTemperatureK } from "../model/PlateThermal.js";
 import { plateProperties } from "../model/PlateType.js";
 
 /** Length of the motion arrows drawn on each plate, view pixels. */
 const MOTION_ARROW_LENGTH = 46;
+
+/**
+ * How wide an arc volcano is drawn relative to how tall, in *pixels*.
+ *
+ * This view stretches elevation against x, so the cone's drawn aspect has to be set in
+ * pixels or it comes out as a needle. The block needs no such correction and does not
+ * apply one — see `arcSectionShape`.
+ */
+const VOLCANO_WIDTH_PER_HEIGHT = 0.8;
 
 export type PlateMotionCanvasNodeOptions = CanvasNodeOptions;
 
@@ -79,6 +88,13 @@ export class PlateMotionCanvasNode extends CanvasNode {
         PlateTectonicsColors.densityRampHighColorProperty,
         PlateTectonicsColors.temperatureRampLowColorProperty,
         PlateTectonicsColors.temperatureRampHighColorProperty,
+        // The motion arrows are drawn in the boundary palette, matching the swatches in
+        // the boundary chooser and the colours the global map gives the same two kinds of
+        // boundary. Linked here so a Projector Mode switch repaints them — without these
+        // two the arrows kept the colours of the profile the canvas last painted in.
+        PlateTectonicsColors.convergentBoundaryColorProperty,
+        PlateTectonicsColors.divergentBoundaryColorProperty,
+        PlateTectonicsColors.convectionArrowColorProperty,
       ],
       () => this.invalidatePaint(),
     );
@@ -143,20 +159,60 @@ export class PlateMotionCanvasNode extends CanvasNode {
     // surface. Drawing it under the crust would hide its middle and make the arc look
     // like it had no connection to the slab that produced it — which is the single
     // relationship this part of the screen exists to show.
+    //
+    // Three stages in the order they happen: blobs rising off the slab, the chamber they
+    // pool in at the base of the crust, and — only once it is full — the conduit. Drawing
+    // the chamber for millions of years before anything erupts is what makes the wait read
+    // as melt collecting rather than as nothing happening.
+    const magmaColor = PlateTectonicsColors.magmaColorProperty.value;
+    for (const blob of geometry.magmaBlobs) {
+      context.fillStyle = magmaColor.withAlpha(blob.opacity).toCSS();
+      context.beginPath();
+      context.ellipse(
+        scale.x(blob.xM),
+        scale.y(blob.elevationM),
+        Math.abs(scale.x(blob.radiusM) - scale.x(0)),
+        Math.abs(scale.y(blob.elevationM + blob.radiusM) - scale.y(blob.elevationM)),
+        0,
+        0,
+        2 * Math.PI,
+      );
+      context.fill();
+    }
+    context.fillStyle = magmaColor.toCSS();
     if (geometry.magma.length > 2) {
-      context.fillStyle = PlateTectonicsColors.magmaColorProperty.value.toCSS();
       this.fillPolygon(context, geometry.magma);
+    }
+    if (geometry.magmaConduit.length > 2) {
+      this.fillPolygon(context, geometry.magmaConduit);
     }
 
     // ── Volcanoes ─────────────────────────────────────────────────────────────
+    // The same *shape* the block draws, but scaled to a legible width in pixels rather
+    // than to true metres. This view magnifies its shallow band about thirty times against
+    // x, so a cone drawn here at true proportions is a needle — and unlike everything else
+    // on the section, a volcano is steep enough for that to matter.
     context.fillStyle = PlateTectonicsColors.volcanoColorProperty.value.toCSS();
+    const shape = arcSectionShape();
     for (const volcano of geometry.volcanoes) {
+      if (volcano.heightM <= 0) {
+        continue;
+      }
       const apexY = scale.y(volcano.baseM + volcano.heightM);
       const baseY = scale.y(volcano.baseM);
-      const halfWidth = Math.max(6, (baseY - apexY) * 0.8);
+      const halfWidth = Math.max(6, (baseY - apexY) * VOLCANO_WIDTH_PER_HEIGHT);
       const centreX = scale.x(volcano.xM);
+
       context.beginPath();
-      context.moveTo(centreX, apexY);
+      shape.forEach(({ u, h }, index) => {
+        const x = centreX + u * halfWidth;
+        const y = baseY - h * (baseY - apexY);
+        if (index === 0) {
+          context.moveTo(x, y);
+        } else {
+          context.lineTo(x, y);
+        }
+      });
       context.lineTo(centreX + halfWidth, baseY);
       context.lineTo(centreX - halfWidth, baseY);
       context.closePath();

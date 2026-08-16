@@ -1,8 +1,8 @@
 /**
  * CrustLabelsNode.ts
  *
- * The text layer over the Crust screen's cross-section: which block is which, which
- * shell is which at the current zoom, and where sea level is.
+ * The text layer over the Crust screen's cross-section: which block is which, how far
+ * each shell reaches at the current zoom, and where sea level is.
  *
  * Scenery `Text` rather than canvas text, so every label is localizable and reachable
  * by a screen reader — the same split the rest of the sim makes between the painted
@@ -13,18 +13,33 @@
  * section or the 3-D block. Sea level is drawn as whatever polyline the placement says
  * it is: a straight line on the flat view, an arc on the block, because sea level is a
  * circle and a chord through it would put the horizon under the ocean.
+ *
+ * ── Extents, not captions ─────────────────────────────────────────────────────
+ * The shells and the user's own crust are named by {@link RangeLabelNode}, which draws a
+ * bar from the top of the range to its bottom. That is what PhET did and it is doing real
+ * work here: the whole screen is about how thick the middle block is and how deep it
+ * reaches, and a caption floating in a band cannot say either. The user's block in
+ * particular had no extent indicator at all, so the thickness slider had nothing to read
+ * against.
+ *
+ * Each range sits at its own model x — see {@link SHELL_LABEL_X_FRACTION} — because five
+ * extents at the same x would be five bars in one column with their names on top of one
+ * another. That staggering is PhET's, and it is why its layer labels are legible at the
+ * whole-Earth zoom.
  */
 
 import { Multilink } from "scenerystack/axon";
-import type { Bounds2 } from "scenerystack/dot";
+import { type Bounds2, Vector2 } from "scenerystack/dot";
 import { Shape } from "scenerystack/kite";
 import { Node, type NodeOptions, Path, Text } from "scenerystack/scenery";
 import { PhetFont } from "scenerystack/scenery-phet";
 import type { EARTH_LAYERS } from "../../common/model/EarthStructure.js";
+import { RangeLabelNode } from "../../common/view/RangeLabelNode.js";
 import type { SectionPlacement } from "../../common/view/SectionPlacement.js";
 import { StringManager } from "../../i18n/StringManager.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import {
+  CRUST_BLOCK_HALF_WIDTH_M,
   INNER_OUTER_CORE_BOUNDARY_KM,
   MANTLE_CORE_BOUNDARY_KM,
   UPPER_LOWER_MANTLE_BOUNDARY_KM,
@@ -38,6 +53,24 @@ const SEA_LEVEL_FONT = new PhetFont(10);
 /** Gap between a block label and the surface it names, view pixels. */
 const BLOCK_LABEL_MARGIN = 6;
 
+/**
+ * Model x of each shell's extent bar, as a fraction of the viewport's half-width.
+ *
+ * Spread across the picture so the bars do not stack. Alternating sides rather than
+ * marching in one direction, so that neighbouring shells — the ones whose bars meet at a
+ * shared boundary — are the furthest apart.
+ */
+const SHELL_LABEL_X_FRACTION: Record<(typeof EARTH_LAYERS)[number], number> = {
+  crust: -0.5,
+  upperMantle: -0.45,
+  lowerMantle: 0.3,
+  outerCore: -0.72,
+  innerCore: 0.72,
+};
+
+/** Model x of the user's crust extent bar, inside the middle block. */
+const MY_CRUST_LABEL_X_M = -0.5 * CRUST_BLOCK_HALF_WIDTH_M;
+
 export type CrustLabelsNodeOptions = NodeOptions;
 
 export class CrustLabelsNode extends Node {
@@ -47,21 +80,16 @@ export class CrustLabelsNode extends Node {
 
   private placement: SectionPlacement;
 
-  /** Elevation the "mantle" label sits at when only the crust zoom is in frame, m. */
-  private readonly mantleLabelElevationM: number;
-
   public constructor(
     model: CrustModel,
     placement: SectionPlacement,
     viewBounds: Bounds2,
-    mantleLabelElevationM: number,
     providedOptions?: CrustLabelsNodeOptions,
   ) {
     super(providedOptions);
     this.model = model;
     this.viewBounds = viewBounds;
     this.placement = placement;
-    this.mantleLabelElevationM = mantleLabelElevationM;
 
     const rebuild = Multilink.multilinkAny(
       [model.showLabelsProperty, model.zoomProperty, model.crustElevationProperty, model.crustThicknessProperty],
@@ -122,11 +150,11 @@ export class CrustLabelsNode extends Node {
     // Only at the crust zoom: once the whole Earth is on screen the blocks are a few
     // pixels tall and a label on each would be three labels on one line of pixels.
     if (model.zoomProperty.value === "crust") {
-      const blockNames = [
-        section.oceanicCrustStringProperty,
-        section.crustStringProperty,
-        section.continentalCrustStringProperty,
-      ];
+      // The middle block gets no caption: its extent bar already names it, and a caption
+      // as well put the word "Crust" on the screen twice within a few pixels. The outer
+      // two keep theirs — they are fixed, so their names are the only thing distinguishing
+      // them, and neither carries an extent.
+      const blockNames = [section.oceanicCrustStringProperty, null, section.continentalCrustStringProperty];
       model.columns.forEach((column, index) => {
         const name = blockNames[index];
         if (!name) {
@@ -156,69 +184,113 @@ export class CrustLabelsNode extends Node {
       });
     }
 
+    // ── The user's crust, as an extent ────────────────────────────────────────
+    this.addMyCrustLabel();
+
     // ── The shells below ──────────────────────────────────────────────────────
     this.addLayerLabels(model.zoomProperty.value);
   }
 
-  /** Labels each shell the current zoom actually reaches, centred in its band. */
+  /**
+   * The middle block's thickness, drawn as a bar from its surface to its base.
+   *
+   * The one label on this screen that answers the question the thickness slider asks. Only
+   * at the crust zoom: at the two wider zooms the block is thinner than the bar's own
+   * crossbars, and the label would collapse into a leader line pointing at a hairline.
+   */
+  private addMyCrustLabel(): void {
+    if (this.model.zoomProperty.value !== "crust") {
+      return;
+    }
+    const section = StringManager.getInstance().getSectionStrings();
+    const column = this.model.myCrust;
+
+    this.addChild(
+      new RangeLabelNode({
+        placement: this.placement,
+        topM: new Vector2(MY_CRUST_LABEL_X_M, column.elevationM),
+        bottomM: new Vector2(MY_CRUST_LABEL_X_M, column.elevationM - column.thicknessM),
+        label: section.crustStringProperty,
+        viewBounds: this.viewBounds,
+        fill: PlateTectonicsColors.textColorProperty,
+        font: LAYER_LABEL_FONT,
+        maxTextWidth: 110,
+      }),
+    );
+  }
+
+  /** Each shell the current zoom reaches, as a bar from its top to its bottom. */
   private addLayerLabels(zoom: CrustZoom): void {
     const section = StringManager.getInstance().getSectionStrings();
     const placement = this.placement;
     const bounds = this.viewBounds;
 
-    const names: Record<(typeof EARTH_LAYERS)[number], typeof section.mantleStringProperty> = {
-      crust: section.crustStringProperty,
-      upperMantle: section.upperMantleStringProperty,
-      lowerMantle: section.lowerMantleStringProperty,
-      outerCore: section.outerCoreStringProperty,
-      innerCore: section.innerCoreStringProperty,
-    };
+    // At the crust zoom only the topmost mantle is in frame, and it is not "upper mantle"
+    // at that scale — it is just what the blocks are floating in. The bar still runs to
+    // the real base of the upper mantle; the label is what the clamp pulls back on screen.
+    const upperMantleName = zoom === "crust" ? section.mantleStringProperty : section.upperMantleStringProperty;
 
     // Top and bottom of each shell in metres of elevation, deepest boundary last.
-    // The upper mantle starts at sea level rather than at the base of the crust: at
-    // these zooms the crust is thinner than a pixel, and using the scale's band boundary
-    // would put the label's top *below* its bottom, which silently dropped it.
-    const bands: { layer: (typeof EARTH_LAYERS)[number]; topM: number; bottomM: number }[] = [
-      { layer: "upperMantle", topM: 0, bottomM: -UPPER_LOWER_MANTLE_BOUNDARY_KM * 1000 },
+    //
+    // The upper mantle starts at the base of the user's crust, which is what PhET tracked
+    // — the mantle really does begin where that block ends, and at the crust zoom that
+    // boundary is the one thing on screen moving as the sliders are dragged. At the wider
+    // zooms it is within a pixel of sea level either way.
+    const myCrustBaseM = this.model.myCrust.elevationM - this.model.myCrust.thicknessM;
+    const bands: {
+      layer: (typeof EARTH_LAYERS)[number];
+      topM: number;
+      bottomM: number;
+      name: typeof section.mantleStringProperty;
+    }[] = [
+      {
+        layer: "upperMantle",
+        topM: zoom === "crust" ? myCrustBaseM : Math.min(0, myCrustBaseM),
+        bottomM: -UPPER_LOWER_MANTLE_BOUNDARY_KM * 1000,
+        name: upperMantleName,
+      },
       {
         layer: "lowerMantle",
         topM: -UPPER_LOWER_MANTLE_BOUNDARY_KM * 1000,
         bottomM: -MANTLE_CORE_BOUNDARY_KM * 1000,
+        name: section.lowerMantleStringProperty,
       },
-      { layer: "outerCore", topM: -MANTLE_CORE_BOUNDARY_KM * 1000, bottomM: -INNER_OUTER_CORE_BOUNDARY_KM * 1000 },
-      { layer: "innerCore", topM: -INNER_OUTER_CORE_BOUNDARY_KM * 1000, bottomM: placement.bottomM },
+      {
+        layer: "outerCore",
+        topM: -MANTLE_CORE_BOUNDARY_KM * 1000,
+        bottomM: -INNER_OUTER_CORE_BOUNDARY_KM * 1000,
+        name: section.outerCoreStringProperty,
+      },
+      {
+        layer: "innerCore",
+        topM: -INNER_OUTER_CORE_BOUNDARY_KM * 1000,
+        bottomM: placement.bottomM,
+        name: section.innerCoreStringProperty,
+      },
     ];
 
-    // At the crust zoom only the mantle is in frame, and it is not "upper mantle" at
-    // that scale — it is just what the blocks are floating in.
-    if (zoom === "crust") {
-      const topY = placement.modelToView(-placement.halfWidthM, this.mantleLabelElevationM).y;
-      this.addChild(
-        new Text(section.mantleStringProperty, {
-          font: LAYER_LABEL_FONT,
-          fill: PlateTectonicsColors.textColorProperty,
-          left: bounds.minX + 8,
-          top: topY + 8,
-          maxWidth: 140,
-        }),
-      );
-      return;
-    }
-
     for (const band of bands) {
-      const topY = placement.modelToView(-placement.halfWidthM, band.topM).y;
-      const bottomY = placement.modelToView(-placement.halfWidthM, band.bottomM).y;
-      // Skip a shell the current zoom does not reach, or one squeezed too thin to label.
-      if (bottomY - topY < 18 || topY >= bounds.maxY) {
+      const xM = SHELL_LABEL_X_FRACTION[band.layer] * placement.halfWidthM;
+      const topY = placement.modelToView(xM, band.topM).y;
+
+      // A shell whose top is already below the section is not reachable at this zoom.
+      // Unlike the old "too thin to label" test, a shell that *is* reached but is squeezed
+      // still gets a label — that is what the collapsed style exists for, and dropping it
+      // was the divergence from PhET this replaces.
+      if (topY >= bounds.maxY) {
         continue;
       }
+
       this.addChild(
-        new Text(names[band.layer], {
-          font: LAYER_LABEL_FONT,
+        new RangeLabelNode({
+          placement,
+          topM: new Vector2(xM, band.topM),
+          bottomM: new Vector2(xM, band.bottomM),
+          label: band.name,
+          viewBounds: bounds,
           fill: PlateTectonicsColors.textColorProperty,
-          left: bounds.minX + 8,
-          centerY: (topY + Math.min(bottomY, bounds.maxY)) / 2,
-          maxWidth: 140,
+          font: LAYER_LABEL_FONT,
+          maxTextWidth: 130,
         }),
       );
     }

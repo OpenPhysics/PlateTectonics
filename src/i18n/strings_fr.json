@@ -71,7 +71,13 @@
     "trench": "Fosse",
     "ridge": "Dorsale océanique",
     "arc": "Arc volcanique",
-    "mountains": "Chaîne de montagnes"
+    "mountains": "Chaîne de montagnes",
+    "continentalCrustLabel": "Croûte continentale",
+    "youngOceanicCrustLabel": "Croûte océanique jeune",
+    "oldOceanicCrustLabel": "Croûte océanique ancienne",
+    "motionMode": "Mouvement",
+    "automatic": "Automatique",
+    "manual": "Manuel"
   },
   "deepTime": {
     "title": "Temps géologique",
@@ -140,7 +146,8 @@
     "upperMantle": "Manteau supérieur",
     "lowerMantle": "Manteau inférieur",
     "outerCore": "Noyau externe",
-    "innerCore": "Noyau interne"
+    "innerCore": "Noyau interne",
+    "lithosphere": "Lithosphère"
   },
   "dataSources": "Plaques : Bird (2003) · Séismes : USGS · Volcans : NOAA/GVP · Relief : NOAA · Âge du plancher : EarthByte",
   "a11y": {
@@ -228,10 +235,10 @@
     "plateMotion": {
       "screenSummary": {
         "playArea": "L'aire de jeu montre une coupe de la limite entre deux plaques tectoniques. Tant qu'aucune plaque n'est choisie, elle est vide, avec une zone de dépôt de chaque côté. Une fois les deux côtés pourvus et un type de limite choisi, l'horloge tourne et la limite évolue : une plaque qui plonge, un océan qui s'ouvre ou des montagnes qui s'élèvent.",
-        "controlArea": "La zone de contrôle comporte trois morceaux de croûte à faire glisser dans les zones de dépôt, un sélecteur de type de limite, des commandes de lecture, pause et pas à pas avec un curseur de vitesse, les boutons Rembobiner et Nouvelle croûte, un choix de coloration de la roche, un choix entre un bloc en trois dimensions et une coupe plane avec un curseur d'exagération verticale, et un bouton Tout réinitialiser.",
+        "controlArea": "La zone de commandes contient trois morceaux de croûte à placer dans les zones de dépôt, un choix entre mouvement automatique et manuel, un sélecteur de type de limite, des commandes lecture, pause et pas à pas avec un curseur de vitesse, les boutons Rembobiner et Nouvelle croûte, un choix de ce qui colore la roche, un choix entre un bloc tridimensionnel et une coupe plane avec un curseur d'exagération verticale, et un bouton Tout réinitialiser.",
         "interactionHint": "Placez une croûte océanique ancienne face à un continent et faites-les converger : regardez où apparaissent les volcans par rapport à la fosse."
       },
-      "currentDetails": "{{plates}} {{motion}} {{time}} {{view}}",
+      "currentDetails": "{{plates}} {{motion}} {{mode}} {{time}} {{view}}",
       "platesNone": "Les deux zones de dépôt sont vides.",
       "platesOne": "Une zone de dépôt contient une plaque ; l'autre est vide.",
       "platesBoth": "Croûte {{left}} à gauche, croûte {{right}} à droite.",
@@ -246,7 +253,7 @@
       "timeFinished": "La limite a parcouru ses {{value}} millions d'années.",
       "controls": {
         "crustPiece": "Croûte {{name}}",
-        "crustPieceHelp": "Faites-la glisser dans l'une des deux zones de dépôt, ou appuyez sur Entrée pour la placer dans la première zone libre.",
+        "crustPieceHelp": "Appuyez pour prendre cette croûte, puis appuyez sur une zone de dépôt pour la placer de ce côté. Elle peut aussi être glissée directement dans une zone.",
         "leftDropZone": "Zone de dépôt gauche",
         "rightDropZone": "Zone de dépôt droite",
         "boundaryType": "Type de limite",
@@ -261,8 +268,17 @@
         "colorModeHelp": "Colorez la coupe selon la masse volumique, la température, ou les deux à la fois.",
         "showLabels": "Afficher les étiquettes",
         "probe": "Sonde",
-        "probeHelp": "Déplacez la sonde dans la coupe pour lire la température et la masse volumique à l'endroit où elle se trouve."
-      }
+        "probeHelp": "Déplacez la sonde dans la coupe pour lire la température et la masse volumique à l'endroit où elle se trouve.",
+        "motionMode": "Mode de mouvement",
+        "motionModeHelp": "En mode automatique, l'horloge avance seule une fois le type de limite choisi. En mode manuel, vous tirez vous-même les plaques et le temps n'avance que pendant ce mouvement.",
+        "leftHandle": "Poignée de la plaque de gauche",
+        "rightHandle": "Poignée de la plaque de droite",
+        "handleHelp": "Faites glisser une poignée à l'opposé de la limite pour écarter les plaques, ou vers elle pour les rapprocher. Les touches fléchées avancent et reculent l'horloge.",
+        "leftDropZoneHelp": "Appuyez pour déposer à gauche la croûte sélectionnée, ou pour retirer la plaque déjà présente.",
+        "rightDropZoneHelp": "Appuyez pour déposer à droite la croûte sélectionnée, ou pour retirer la plaque déjà présente."
+      },
+      "modeAutomatic": "L'horloge avance seule.",
+      "modeManual": "Le temps n'avance que lorsqu'une poignée de plaque est déplacée."
     },
     "deepTime": {
       "screenSummary": {

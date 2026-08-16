@@ -261,12 +261,23 @@ export abstract class EarthBlockNode extends CanvasNode {
    * imply relief that is not there.
    */
   protected addFrontPolygon(points: readonly Vector2[], color: Color, layer: number): void {
+    this.addPolygonAtZ(points, this.blockBounds().maxZM, color, layer);
+  }
+
+  /**
+   * An arbitrary polygon on a plane of constant z inside the block.
+   *
+   * For things that stand at a depth into the block rather than on its cut face — the
+   * plumes over a volcanic arc, which is a chain across the block and not a single cone on
+   * the section. Unshaded for the same reason `addFrontPolygon` is: every polygon on one
+   * such plane shares a normal, so shading by it would tint them all identically.
+   */
+  protected addPolygonAtZ(points: readonly Vector2[], zM: number, color: Color, layer: number): void {
     if (points.length < 3) {
       return;
     }
-    const z = this.blockBounds().maxZM;
     this.faceRenderer.addFace(
-      points.map((point) => this.scenePoint(point.x, point.y, z)),
+      points.map((point) => this.scenePoint(point.x, point.y, zM)),
       color,
       { layer, shade: false },
     );

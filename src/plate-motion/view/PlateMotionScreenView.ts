@@ -38,11 +38,13 @@ import type { PlateMotionModel } from "../model/PlateMotionModel.js";
 import { simpleMantleTemperatureK } from "../model/PlateThermal.js";
 import { CrustChooserPanel } from "./CrustChooserPanel.js";
 import { MotionTypeControlPanel } from "./MotionTypeControlPanel.js";
+import { PlateHandleNode } from "./PlateHandleNode.js";
 import { PlateMotionBlockNode } from "./PlateMotionBlockNode.js";
 import { PlateMotionCanvasNode } from "./PlateMotionCanvasNode.js";
 import { PlateMotionLabelsNode } from "./PlateMotionLabelsNode.js";
 import { PlateMotionScreenSummaryContent } from "./PlateMotionScreenSummaryContent.js";
 import { PlateMotionTimeControlPanel } from "./PlateMotionTimeControlPanel.js";
+import { PlayModeControl } from "./PlayModeControl.js";
 
 /** Highest elevation the shallow band shows, m — clears the tallest collision belt. */
 const RELIEF_TOP_M = 16000;
@@ -56,9 +58,21 @@ const SECTION_BOTTOM_M = -300000;
 /** Fraction of the viewport height the magnified shallow band takes. */
 const RELIEF_BAND_FRACTION = 0.3;
 
+/**
+ * Width of the Automatic / Manual panel, view pixels.
+ *
+ * Narrower than CONTROL_PANEL_WIDTH because it shares the row above the section with the
+ * crust chooser rather than living in the right-hand column — where a fourth panel would
+ * not fit under the boundary, time and view panels.
+ */
+const PLAY_MODE_PANEL_WIDTH = 150;
+
 export type PlateMotionScreenViewOptions = ScreenViewOptions;
 
 export class PlateMotionScreenView extends ScreenView {
+  /** The two manual-mode handles; a held handle advances the clock every frame. */
+  private readonly handles: PlateHandleNode[] = [];
+
   public constructor(
     model: PlateMotionModel,
     _preferences: PlateTectonicsPreferencesModel,
@@ -73,18 +87,23 @@ export class PlateMotionScreenView extends ScreenView {
     const strings = StringManager.getInstance();
     const a11y = strings.getPlateMotionA11yStrings().controls;
 
-    // The chooser sits above the section, so the section starts below it. Built first and
-    // measured rather than allowed for by a constant: the panel's height depends on the
-    // font and on the length of the three localized crust names, and a guess that is too
-    // small puts the panel on top of the cross-section.
+    // The chooser and the mode switch share the row above the section, so the section
+    // starts below whichever is taller. Built first and measured rather than allowed for
+    // by a constant: their heights depend on the font and on the length of the localized
+    // names, and a guess that is too small puts a panel on top of the cross-section.
     const chooser = new CrustChooserPanel(model, {
       left: SECTION_VIEW_BOUNDS.minX,
+      top: SECTION_VIEW_BOUNDS.minY,
+    });
+    const playModeControl = new PlayModeControl(model, {
+      minWidth: PLAY_MODE_PANEL_WIDTH,
+      left: chooser.right + PANEL_SPACING,
       top: SECTION_VIEW_BOUNDS.minY,
     });
 
     const bounds = new Bounds2(
       SECTION_VIEW_BOUNDS.minX,
-      SECTION_VIEW_BOUNDS.minY + chooser.height + PANEL_SPACING,
+      SECTION_VIEW_BOUNDS.minY + Math.max(chooser.height, playModeControl.height) + PANEL_SPACING,
       SECTION_VIEW_BOUNDS.maxX,
       SECTION_VIEW_BOUNDS.maxY,
     );
@@ -126,6 +145,24 @@ export class PlateMotionScreenView extends ScreenView {
 
     const labels = new PlateMotionLabelsNode(model, placement(), bounds);
     this.addChild(labels);
+
+    // ── The drag handles ──────────────────────────────────────────────────────
+    // Manual mode's whole interface: one handle per plate, standing on the plate it moves.
+    // Kept above the labels so a handle is never hidden behind a range bar, and below the
+    // probe and the ruler, which the user is expected to put wherever they like.
+    const handles = (["left", "right"] as const).map(
+      (side) =>
+        new PlateHandleNode(model, side, {
+          placement: placement(),
+          viewBounds: bounds,
+          accessibleName: side === "left" ? a11y.leftHandleStringProperty : a11y.rightHandleStringProperty,
+          accessibleHelpText: a11y.handleHelpStringProperty,
+        }),
+    );
+    this.handles.push(...handles);
+    for (const handle of handles) {
+      this.addChild(handle);
+    }
 
     // ── The probe ─────────────────────────────────────────────────────────────
     // Reads the mantle geotherm and a nominal mantle density. Unlike the Crust screen it
@@ -169,11 +206,15 @@ export class PlateMotionScreenView extends ScreenView {
         labels.setPlacement(placement());
         probe.refreshPosition();
         ruler.setPlacement(placement());
+        for (const handle of handles) {
+          handle.setPlacement(placement());
+        }
       },
     );
 
-    // ── Crust chooser, above the section ──────────────────────────────────────
+    // ── Crust chooser and mode switch, above the section ──────────────────────
     this.addChild(chooser);
+    this.addChild(playModeControl);
 
     // ── Legend ────────────────────────────────────────────────────────────────
     const legend = new MaterialLegendNode(model.colorModeProperty, {
@@ -194,6 +235,7 @@ export class PlateMotionScreenView extends ScreenView {
     const viewPanel = new ColorModeControlPanel(model.colorModeProperty, {
       showLabelsProperty: model.showLabelsProperty,
       showSeawaterProperty: model.showSeawaterProperty,
+      showSeawaterEnabledProperty: model.hasBothPlatesProperty,
       sectionViewModel: model.sectionView,
       colorModeAccessibleName: a11y.colorModeStringProperty,
       colorModeAccessibleHelpText: a11y.colorModeHelpStringProperty,
@@ -204,6 +246,13 @@ export class PlateMotionScreenView extends ScreenView {
     this.addChild(motionPanel);
     this.addChild(timePanel);
     this.addChild(viewPanel);
+
+    // The time panel collapses in manual mode — there is no clock to play, pause or set
+    // the speed of — so the panel below it follows rather than leaving a hole in the
+    // column where the transport controls used to be.
+    model.isManualModeProperty.link(() => {
+      viewPanel.top = timePanel.bottom + PANEL_SPACING;
+    });
 
     // ── Reset All ─────────────────────────────────────────────────────────────
     const resetAllButton = new ResetAllButton({
@@ -216,6 +265,22 @@ export class PlateMotionScreenView extends ScreenView {
     });
     this.addChild(resetAllButton);
 
+    // ── Dragging a crust piece into a zone ────────────────────────────────────
+    // The chooser's pointer shortcut needs two things it cannot have when it is built: a
+    // layer to carry the piece in, and where the zones currently are — which comes from the
+    // section's projection, and so changes with the view and with the vertical
+    // exaggeration. Both are read live, so neither goes stale. The layer is added last, and
+    // is above everything: a piece is carried over the picture rather than through it.
+    const dragLayer = new Node({ pickable: false });
+    this.addChild(dragLayer);
+    chooser.setDropTarget({
+      dragLayer,
+      sideAtGlobalPoint: (point) => labels.sideAtGlobalPoint(point),
+      setHoveredSide: (side) => {
+        labels.setHoveredZone(side);
+      },
+    });
+
     // ── Accessibility: keyboard / reading traversal order ─────────────────────
     // The chooser first, because building a boundary is the first thing to do and
     // nothing else on the screen does anything until it is done. Reset All last.
@@ -223,6 +288,9 @@ export class PlateMotionScreenView extends ScreenView {
       new Node({
         pdomOrder: [
           ...chooser.focusOrder,
+          ...labels.zones,
+          ...playModeControl.focusOrder,
+          ...handles,
           probe,
           ruler,
           ...motionPanel.focusOrder,
@@ -235,10 +303,16 @@ export class PlateMotionScreenView extends ScreenView {
   }
 
   /**
-   * The boundary evolves from the model clock and the canvas repaints from its Property
-   * links, so nothing is needed here.
+   * In automatic mode the boundary evolves from the model clock and the canvas repaints
+   * from its Property links, so there is nothing to do here.
+   *
+   * In manual mode there is: a handle that is being held out advances the clock for as
+   * long as it is held, and being held is a duration rather than an event, so it has no
+   * Property change to hang itself on.
    */
-  public override step(_dt: number): void {
-    // Intentionally empty — see the class documentation.
+  public override step(dt: number): void {
+    for (const handle of this.handles) {
+      handle.step(dt);
+    }
   }
 }

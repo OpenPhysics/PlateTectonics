@@ -9,13 +9,26 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  ARC_Z_PERIOD_FACTOR_M,
   COLLISION_TIME_LIMIT_MYR,
+  MAGMA_FILL_OCEANIC_SPEEDUP,
+  MAGMA_FILL_START_OLD_MYR,
+  MAGMA_FILL_START_YOUNG_MYR,
   NEW_CRUST_LABEL_DELAY_MYR,
   PLATE_X_LIMIT_M,
   RIFTING_TIME_LIMIT_MYR,
   SUBDUCTION_TIME_LIMIT_MYR,
 } from "../src/PlateTectonicsConstants.js";
-import { boundaryGeometry, type PlateOutline, restingGeometry } from "../src/plate-motion/model/PlateGeometry.js";
+import {
+  arcCones,
+  arcRiseM,
+  arcSectionProfile,
+  boundaryGeometry,
+  chamberFullAtMyr,
+  chamberFullness,
+  type PlateOutline,
+  restingGeometry,
+} from "../src/plate-motion/model/PlateGeometry.js";
 import { PLATE_TYPES, type PlateType } from "../src/plate-motion/model/PlateType.js";
 
 /** Cross-sectional area of the crust in an outline, by the trapezium rule. */
@@ -280,3 +293,150 @@ describe("collision", () => {
 
 /** The cap the collision geometry clamps to, re-declared for readability above. */
 const COLLISION_ELEVATION_MAX = 13000;
+
+describe("the magma chamber and the arc", () => {
+  const overriding: PlateType = "continental";
+  const downgoing: PlateType = "oldOceanic";
+
+  it("makes the user wait while the chamber fills", () => {
+    // The claim: an arc *lags* its trench by millions of years. Melt is generated slowly,
+    // rises slowly, and pools at the base of the overriding crust; nothing erupts until
+    // enough has collected. A screen that put a volcano up the moment the slab reached
+    // melting depth would be teaching that subduction and volcanism are simultaneous.
+    const fullAt = chamberFullAtMyr(downgoing, overriding);
+
+    expect(chamberFullness(downgoing, overriding, 0)).toBe(0);
+    expect(chamberFullness(downgoing, overriding, MAGMA_FILL_START_OLD_MYR)).toBe(0);
+    expect(chamberFullness(downgoing, overriding, fullAt)).toBe(1);
+
+    // Monotone in between, so it reads as filling rather than as flicking on.
+    const half = (MAGMA_FILL_START_OLD_MYR + fullAt) / 2;
+    const partial = chamberFullness(downgoing, overriding, half);
+    expect(partial).toBeGreaterThan(0);
+    expect(partial).toBeLessThan(1);
+  });
+
+  it("puts up no volcano before the chamber is full, and one after", () => {
+    const fullAt = chamberFullAtMyr(downgoing, overriding);
+
+    const before = boundaryGeometry("convergent", overriding, downgoing, fullAt - 1);
+    expect(before.chamberFullness).toBeLessThan(1);
+    expect(before.volcanoes).toEqual([]);
+    expect(before.magmaConduit).toEqual([]);
+
+    // The chamber itself is there long before that, which is what makes the wait legible
+    // instead of looking like nothing is happening.
+    expect(before.magma.length).toBeGreaterThan(2);
+
+    const after = boundaryGeometry("convergent", overriding, downgoing, fullAt + 5);
+    expect(after.chamberFullness).toBe(1);
+    expect(after.volcanoes.length).toBe(1);
+    expect(after.magmaConduit.length).toBeGreaterThan(2);
+  });
+
+  it("fills the chamber faster under an oceanic overriding plate", () => {
+    // PhET's factor of five. Oceanic crust is a third the thickness of continental, so
+    // there is far less of it for the melt to work through — which is why island arcs are
+    // productive on a shorter timescale than continental ones.
+    const underContinent = chamberFullAtMyr(downgoing, "continental");
+    const underOcean = chamberFullAtMyr(downgoing, "youngOceanic");
+
+    expect(underOcean).toBeLessThan(underContinent);
+
+    // The melt does not arrive any *sooner*; it only accumulates faster once it does.
+    const spanContinent = underContinent - MAGMA_FILL_START_OLD_MYR;
+    const spanOcean = underOcean - MAGMA_FILL_START_OLD_MYR;
+    expect(spanOcean).toBeCloseTo(spanContinent / MAGMA_FILL_OCEANIC_SPEEDUP, 9);
+  });
+
+  it("starts feeding melt sooner under an older, steeper slab", () => {
+    // Colder, denser lithosphere dips more steeply, so it reaches the dehydration window
+    // in less horizontal travel — and therefore in less time.
+    expect(MAGMA_FILL_START_OLD_MYR).toBeLessThan(MAGMA_FILL_START_YOUNG_MYR);
+    expect(chamberFullAtMyr("oldOceanic", overriding)).toBeLessThan(chamberFullAtMyr("youngOceanic", overriding));
+  });
+
+  it("draws the arc as a chain of separate cones across the block", () => {
+    // Not one ridge extruded straight back. An arc is a line of offset cones, and that
+    // shape is what makes an island arc recognisable rather than a wall.
+    const geometry = boundaryGeometry("convergent", overriding, downgoing, SUBDUCTION_TIME_LIMIT_MYR);
+    const cones = arcCones(geometry, -300000);
+
+    expect(cones.length).toBeGreaterThan(2);
+
+    // They are spread through the block, not stacked at the cut face.
+    expect(new Set(cones.map((cone) => cone.zM)).size).toBe(cones.length);
+
+    // And they are staggered in x rather than in a straight row.
+    expect(new Set(cones.map((cone) => cone.xM)).size).toBeGreaterThan(1);
+  });
+
+  it("leaves the far field flat, so only the arc has structure in z", () => {
+    // Everything else on this screen is a two-dimensional model extruded straight back,
+    // which is what a cross-section assumes and the right picture for a trench. Bounding
+    // the z variation is also what keeps the terrain affordable: it is resampled on every
+    // frame while the clock runs.
+    const geometry = boundaryGeometry("convergent", overriding, downgoing, SUBDUCTION_TIME_LIMIT_MYR);
+    const arcXM = geometry.volcanoes[0]?.xM ?? 0;
+
+    expect(arcRiseM(geometry, arcXM, 0)).toBeGreaterThan(0);
+    expect(arcRiseM(geometry, arcXM + 200000, 0)).toBe(0);
+    expect(arcRiseM(geometry, arcXM - 200000, -50000)).toBe(0);
+  });
+
+  it("raises the ground most on a cone and least between them", () => {
+    const geometry = boundaryGeometry("convergent", overriding, downgoing, SUBDUCTION_TIME_LIMIT_MYR);
+    const cone = arcCones(geometry, -300000)[1];
+    expect(cone).toBeDefined();
+    const summit = cone as { xM: number; zM: number };
+
+    const onSummit = arcRiseM(geometry, summit.xM, summit.zM);
+    // A quarter period further back is the valley between two cones.
+    const valleyZM = summit.zM - Math.PI * ARC_Z_PERIOD_FACTOR_M;
+    const inValley = arcRiseM(geometry, summit.xM, valleyZM);
+
+    expect(onSummit).toBeGreaterThan(0);
+    expect(inValley).toBeLessThan(onSummit / 4);
+  });
+
+  it("replays the same cones for the same instant, and grows them in between", () => {
+    // The screen's whole design: the picture is a pure function of the clock, so Rewind
+    // and step-while-paused land on exactly the arc that was there before.
+    const at = (tMyr: number) => arcCones(boundaryGeometry("convergent", overriding, downgoing, tMyr), -300000);
+    const fullAt = chamberFullAtMyr(downgoing, overriding);
+
+    expect(at(fullAt + 4)).toEqual(at(fullAt + 4));
+
+    // The cones stay where they are and get taller — an arc does not wander as it erupts.
+    const early = at(fullAt + 2);
+    const late = at(fullAt + 8);
+    expect(late.map((cone) => [cone.xM, cone.zM])).toEqual(early.map((cone) => [cone.xM, cone.zM]));
+    expect(late[0]?.heightM ?? 0).toBeGreaterThan(early[0]?.heightM ?? 0);
+  });
+
+  it("cuts the section through the arc rather than beside it", () => {
+    // The cone drawn on the cut face and the cone standing on the block are the same
+    // object, so the section's profile has to be sampled from the same field the terrain
+    // is — otherwise the two disagree along the flanks and leave a sliver of sky.
+    const geometry = boundaryGeometry("convergent", overriding, downgoing, SUBDUCTION_TIME_LIMIT_MYR);
+    const volcano = geometry.volcanoes[0];
+    expect(volcano).toBeDefined();
+    const cone = volcano as { xM: number; baseM: number; heightM: number };
+
+    for (const point of arcSectionProfile(cone)) {
+      const expected = cone.baseM + arcRiseM(geometry, point.x, 0);
+      // Every point is either on the profile or on the closing base line.
+      expect(point.y === cone.baseM || Math.abs(point.y - expected) < 1e-6).toBe(true);
+    }
+  });
+
+  it("sends blobs of melt up off the slab towards the chamber", () => {
+    const geometry = boundaryGeometry("convergent", overriding, downgoing, 30);
+    expect(geometry.magmaBlobs.length).toBeGreaterThan(0);
+    for (const blob of geometry.magmaBlobs) {
+      expect(blob.opacity).toBeGreaterThan(0);
+      expect(blob.opacity).toBeLessThanOrEqual(1);
+      expect(blob.xM).toBeLessThan(0);
+    }
+  });
+});

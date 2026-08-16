@@ -38,6 +38,13 @@ type SelfOptions = {
   showSeawaterProperty?: Property<boolean>;
 
   /**
+   * When the seawater checkbox is live. PhET disabled it until both plates existed, and
+   * that is worth keeping: before then there is no ground for a sea to lie on, so the
+   * control has no visible effect and reads as broken rather than as not-yet-applicable.
+   */
+  showSeawaterEnabledProperty?: TReadOnlyProperty<boolean>;
+
+  /**
    * Supply to add the flat/block choice and the vertical-exaggeration slider. The
    * slider is only enabled while the block is showing — the flat view has its own
    * two-band vertical scale, which the exaggeration has no say over.
@@ -118,6 +125,7 @@ export class ColorModeControlPanel extends PlateTectonicsPanel {
       const seawaterCheckbox = new Checkbox(options.showSeawaterProperty, label(material.showSeawaterStringProperty), {
         ...checkboxOptions,
         accessibleName: material.showSeawaterStringProperty,
+        ...(options.showSeawaterEnabledProperty ? { enabledProperty: options.showSeawaterEnabledProperty } : {}),
       });
       children.push(seawaterCheckbox);
       focusOrder.push(seawaterCheckbox);

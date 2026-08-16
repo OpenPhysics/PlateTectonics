@@ -38,6 +38,8 @@ import {
 import { materialFill } from "../../common/view/EarthMaterial.js";
 import PlateTectonicsColors from "../../PlateTectonicsColors.js";
 import {
+  ARC_X_DECAY_M,
+  ARC_Z_PERIOD_FACTOR_M,
   BLOCK_DEPTH_PER_HEIGHT,
   BLOCK_MAX_DEPTH_FRACTION,
   LITHOSPHERIC_MANTLE_DENSITY_KG_M3,
@@ -46,7 +48,15 @@ import {
   SLAB_DENSITY_KG_M3,
   SURFACE_TEMPERATURE_K,
 } from "../../PlateTectonicsConstants.js";
-import { type BoundaryGeometry, boundaryGeometry, type PlateOutline } from "../model/PlateGeometry.js";
+import {
+  arcCones,
+  arcRiseM,
+  arcSectionProfile,
+  type BoundaryGeometry,
+  boundaryGeometry,
+  elevationAtX,
+  type PlateOutline,
+} from "../model/PlateGeometry.js";
 import type { PlateMotionModel } from "../model/PlateMotionModel.js";
 import { simpleMantleTemperatureK } from "../model/PlateThermal.js";
 import { plateProperties } from "../model/PlateType.js";
@@ -74,13 +84,6 @@ const SECTION_LAYER = {
 
 /** Elevation of the ground far from the boundary before any plate has been dropped, m. */
 const EMPTY_GROUND_M = -4000;
-
-/**
- * How wide a volcano is drawn relative to how tall, as seen on screen.
- *
- * Matches the ratio the flat painter uses in pixels, so the two views draw the same cone.
- */
-const VOLCANO_WIDTH_PER_HEIGHT = 0.8;
 
 /** How many puffs are in the air above an erupting volcano at once. */
 const SMOKE_PUFFS = 5;
@@ -154,6 +157,8 @@ export class PlateMotionBlockNode extends EarthBlockNode {
         PlateTectonicsColors.terrainShallowSeabedColorProperty,
         PlateTectonicsColors.terrainGrassColorProperty,
         PlateTectonicsColors.terrainSnowColorProperty,
+        PlateTectonicsColors.convergentBoundaryColorProperty,
+        PlateTectonicsColors.divergentBoundaryColorProperty,
       ],
       () => {
         this.cachedGeometry = null;
@@ -220,12 +225,30 @@ export class PlateMotionBlockNode extends EarthBlockNode {
   /**
    * Elevation of the ground at a point.
    *
-   * Constant in z: the boundary is a two-dimensional model extruded back into the block,
-   * which is exactly what a cross-section assumes. Interpolated across x from the merged
-   * ground profile, and clamped at both ends so the block's edges sit at the elevation
-   * of the outermost sample rather than falling to zero.
+   * Constant in z almost everywhere: the boundary is a two-dimensional model extruded back
+   * into the block, which is exactly what a cross-section assumes, and it is the right
+   * assumption for a trench and for a mountain belt. The volcanic arc is the one place it
+   * is wrong — an arc is a *chain* of separate cones, and that is the shape that makes an
+   * island arc recognisable — so {@link arcRiseM} adds structure in z, and only within a
+   * window either side of the arc.
+   *
+   * Restricting it that way is not just thrift. The block resamples this whole grid every
+   * frame while the clock runs, and PhET's own code carried a performance TODO asking for
+   * exactly this bound.
    */
-  protected terrainElevationM(xM: number): number {
+  protected terrainElevationM(xM: number, zM: number): number {
+    const base = this.baseGroundM(xM);
+    const geometry = this.geometry();
+    return geometry ? base + arcRiseM(geometry, xM, zM) : base;
+  }
+
+  /**
+   * The ground before the arc is added, interpolated across x from the merged profile.
+   *
+   * Clamped at both ends so the block's edges sit at the elevation of the outermost sample
+   * rather than falling to zero.
+   */
+  private baseGroundM(xM: number): number {
     const profile = this.groundProfile();
     const first = profile?.[0];
     const last = profile?.[profile.length - 1];
@@ -260,7 +283,10 @@ export class PlateMotionBlockNode extends EarthBlockNode {
    * layer test only has to resolve crust, lithospheric mantle and asthenosphere.
    */
   protected materialColorAt(xM: number, elevationM: number): Color | null {
-    if (elevationM > this.terrainElevationM(xM)) {
+    // Against the ground before the arc is added: the walls are at the far edges of the
+    // block, hundreds of kilometres from any arc, and a z-dependent ground here would be
+    // asking a question whose answer is always the same.
+    if (elevationM > this.baseGroundM(xM)) {
       return null;
     }
     const mode = this.model.colorModeProperty.value;
@@ -272,10 +298,10 @@ export class PlateMotionBlockNode extends EarthBlockNode {
     const outline = xM < 0 ? geometry.left : geometry.right;
     const type = (xM < 0 ? this.model.leftPlateTypeProperty : this.model.rightPlateTypeProperty).value;
 
-    if (type && elevationM >= profileAt(outline.crustBase, xM)) {
+    if (type && elevationM >= elevationAtX(outline.crustBase, xM)) {
       return materialFill(mode, plateProperties(type).densityKgM3, SURFACE_TEMPERATURE_K + 450);
     }
-    if (elevationM >= profileAt(outline.lithosphereBase, xM)) {
+    if (elevationM >= elevationAtX(outline.lithosphereBase, xM)) {
       return materialFill(mode, LITHOSPHERIC_MANTLE_DENSITY_KG_M3, SURFACE_TEMPERATURE_K + 900);
     }
     return materialFill(mode, MANTLE_DENSITY_KG_M3, simpleMantleTemperatureK(-elevationM));
@@ -395,35 +421,51 @@ export class PlateMotionBlockNode extends EarthBlockNode {
     );
   }
 
-  /** Magma and the volcanoes it feeds, over the plates they have come up through. */
+  /**
+   * Magma and the volcanoes it feeds, over the plates they have come up through.
+   *
+   * Three stages, in the order they happen: blobs rising off the slab, the chamber they
+   * collect in, and — once it is full — the conduit and the cone it feeds. Drawing the
+   * chamber long before anything erupts is what makes the wait legible rather than
+   * looking like nothing is happening.
+   */
   protected override paintSectionFeatures(): void {
     const geometry = this.geometry();
     if (!geometry) {
       return;
     }
 
+    const magmaColor = PlateTectonicsColors.magmaColorProperty.value;
+
+    for (const blob of geometry.magmaBlobs) {
+      this.addFrontPolygon(
+        polygonCircle(blob.xM, blob.elevationM, blob.radiusM),
+        magmaColor.withAlpha(blob.opacity),
+        SECTION_LAYER.magma,
+      );
+    }
     if (geometry.magma.length > 2) {
-      this.addFrontPolygon(geometry.magma, PlateTectonicsColors.magmaColorProperty.value, SECTION_LAYER.magma);
+      this.addFrontPolygon(geometry.magma, magmaColor, SECTION_LAYER.magma);
+    }
+    if (geometry.magmaConduit.length > 2) {
+      this.addFrontPolygon(geometry.magmaConduit, magmaColor, SECTION_LAYER.magma);
     }
 
+    // The cone on the cut face, drawn from the same profile the terrain uses, so the
+    // section's volcano is the cut through the arc rather than a triangle beside it.
     const volcanoColor = PlateTectonicsColors.volcanoColorProperty.value;
     for (const volcano of geometry.volcanoes) {
-      // Half-width from the height, so a volcano keeps its shape whatever the camera is
-      // doing — and multiplied by the exaggeration, because only the height is stretched.
-      // Without that factor a stretched section draws its arc as a needle: the cone grows
-      // three times taller while staying exactly as wide.
-      const halfWidth = Math.max(8000, volcano.heightM * VOLCANO_WIDTH_PER_HEIGHT * this.verticalExaggeration);
-      this.addFrontPolygon(
-        [
-          new Vector2(volcano.xM, volcano.baseM + volcano.heightM),
-          new Vector2(volcano.xM + halfWidth, volcano.baseM),
-          new Vector2(volcano.xM - halfWidth, volcano.baseM),
-        ],
-        volcanoColor,
-        SECTION_LAYER.volcanoes,
-      );
+      if (volcano.heightM <= 0) {
+        continue;
+      }
+      this.addFrontPolygon(arcSectionProfile(volcano), volcanoColor, SECTION_LAYER.volcanoes);
+    }
 
-      this.paintSmoke(volcano.xM, volcano.baseM + volcano.heightM, volcano.heightM, halfWidth);
+    // A plume on every cone of the chain, not just the one the section happens to pass
+    // through — a single column of smoke on an otherwise bare ridge is what made the arc
+    // read as one volcano.
+    for (const cone of arcCones(geometry, this.blockBounds().minZM)) {
+      this.paintSmoke(cone.xM, cone.zM, cone.baseM + cone.heightM, cone.heightM);
     }
   }
 
@@ -438,37 +480,33 @@ export class PlateMotionBlockNode extends EarthBlockNode {
    * visible difference is that the puffs repeat rather than being individually random,
    * which at this size is not a difference anyone can see.
    */
-  private paintSmoke(xM: number, apexM: number, volcanoHeightM: number, volcanoHalfWidthM: number): void {
+  private paintSmoke(xM: number, zM: number, apexM: number, volcanoHeightM: number): void {
     const timeMyr = this.model.timeMillionsOfYearsProperty.value;
     const base = PlateTectonicsColors.volcanicSmokeColorProperty.value;
 
     // Measured against the cone's own height, so the plume is always a couple of volcanoes
-    // tall however big the volcano has grown. Against its *width* it would instead be
-    // driven by the minimum width a cone is allowed to be drawn at, which is a floor for
-    // legibility rather than anything about the volcano — and a plume scaled to that
-    // climbs off the top of the block.
+    // tall however big the volcano has grown.
     //
     // In unexaggerated metres, unlike the width: elevations are what the exaggeration
     // stretches, so a rise given here in true metres already grows with the section.
     const riseM = volcanoHeightM * SMOKE_RISE_PER_HEIGHT;
+    const halfWidthM = ARC_X_DECAY_M;
+
+    // Each cone's plume is offset in phase by its own position, so the chain does not puff
+    // in unison — which would read as one object seen several times rather than as several
+    // volcanoes. Derived from z, so it is still a pure function of the clock.
+    const conePhase = Math.abs(zM / (2 * Math.PI * ARC_Z_PERIOD_FACTOR_M)) * 0.37;
 
     for (let index = 0; index < SMOKE_PUFFS; index++) {
-      const phase = (timeMyr / SMOKE_PERIOD_MYR + index / SMOKE_PUFFS) % 1;
+      const phase = (timeMyr / SMOKE_PERIOD_MYR + index / SMOKE_PUFFS + conePhase) % 1;
 
       // Grows and fades as it climbs, so the plume thins out with height.
-      const radiusM = volcanoHalfWidthM * (SMOKE_START_RADIUS + phase * SMOKE_GROWTH);
-      const centreXM = xM + phase * volcanoHalfWidthM * SMOKE_DRIFT;
+      const radiusM = halfWidthM * (SMOKE_START_RADIUS + phase * SMOKE_GROWTH);
+      const centreXM = xM + phase * halfWidthM * SMOKE_DRIFT;
       const centreYM = apexM + phase * riseM;
       const color = base.withAlpha(SMOKE_MAX_ALPHA * (1 - phase));
 
-      // An octagon rather than a circle: the renderer takes polygons, and at this size
-      // eight sides are indistinguishable from a disc.
-      const corners: Vector2[] = [];
-      for (let corner = 0; corner < 8; corner++) {
-        const angle = (corner / 8) * 2 * Math.PI;
-        corners.push(new Vector2(centreXM + radiusM * Math.cos(angle), centreYM + radiusM * Math.sin(angle)));
-      }
-      this.addFrontPolygon(corners, color, SECTION_LAYER.smoke);
+      this.addPolygonAtZ(polygonCircle(centreXM, centreYM, radiusM), zM, color, SECTION_LAYER.smoke);
     }
   }
 
@@ -507,7 +545,7 @@ export class PlateMotionBlockNode extends EarthBlockNode {
       // stretching the section stretches the block, and the camera refits to match.
       const block = this.blockBounds();
       const clearanceM = (block.maxYM - block.minYM) * ARROW_CLEARANCE_FRACTION;
-      const yM = Math.min(block.maxYM - clearanceM, this.terrainElevationM(tailXM) + clearanceM);
+      const yM = Math.min(block.maxYM - clearanceM, this.terrainElevationM(tailXM, block.maxZM) + clearanceM);
 
       this.addFrontPolygon(
         [
@@ -544,48 +582,15 @@ const ARROW_HEAD_HALF_WIDTH_M = 17000;
 /** How far above the ground an arrow floats, as a fraction of the block's height. */
 const ARROW_CLEARANCE_FRACTION = 0.05;
 
-/**
- * Elevation of a profile at a given x, by linear interpolation.
- *
- * Free-standing rather than a method because it makes no use of the node: it is the same
- * "read a polyline as a function of x" that the ground profile does, applied to the
- * layer boundaries instead. Clamps outside the profile's own range.
- */
-function profileAt(profile: readonly Vector2[], xM: number): number {
-  if (profile.length === 0) {
-    return Number.NEGATIVE_INFINITY;
-  }
+/** Sides a circle is drawn with. At these sizes it is indistinguishable from a disc. */
+const CIRCLE_SIDES = 12;
 
-  // The polylines run in whichever direction their behaviour produced them — see
-  // PlateOutline — so the ends have to be identified by value, not by index.
-  let low = profile[0];
-  let high = profile[0];
-  for (const point of profile) {
-    if (!low || point.x < low.x) {
-      low = point;
-    }
-    if (!high || point.x > high.x) {
-      high = point;
-    }
+/** A circle as a polygon, because the renderer takes polygons. */
+function polygonCircle(centreXM: number, centreYM: number, radiusM: number): Vector2[] {
+  const points: Vector2[] = [];
+  for (let i = 0; i < CIRCLE_SIDES; i++) {
+    const angle = (i / CIRCLE_SIDES) * 2 * Math.PI;
+    points.push(new Vector2(centreXM + radiusM * Math.cos(angle), centreYM + radiusM * Math.sin(angle)));
   }
-  if (!(low && high)) {
-    return Number.NEGATIVE_INFINITY;
-  }
-  if (xM <= low.x) {
-    return low.y;
-  }
-  if (xM >= high.x) {
-    return high.y;
-  }
-
-  let best = low;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const point of profile) {
-    const distance = Math.abs(point.x - xM);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = point;
-    }
-  }
-  return best.y;
+  return points;
 }

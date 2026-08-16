@@ -11,6 +11,11 @@
  *
  * The whole panel is disabled until a motion has been chosen, because until then there is
  * no history to run.
+ *
+ * In manual mode it collapses to the elapsed readout plus Rewind and New Crust, as PhET's
+ * `TectonicsTimeControl` does: there is no clock to play, pause, step or set the speed of,
+ * because the user *is* the clock. Leaving the transport controls on screen but inert
+ * would say the mode had not taken effect.
  */
 
 import { DerivedProperty, DerivedStringProperty, type TReadOnlyProperty } from "scenerystack/axon";
@@ -52,6 +57,9 @@ export class PlateMotionTimeControlPanel extends PlateTectonicsPanel {
     // Nothing to run until a boundary type has been chosen.
     const running = new DerivedProperty([model.animationStartedProperty], (started: boolean) => started);
 
+    // The transport controls exist only while there is a clock for them to control.
+    const automatic = new DerivedProperty([model.isManualModeProperty], (manual: boolean) => !manual);
+
     const elapsed = new DerivedStringProperty(
       [model.timeMillionsOfYearsProperty, motion.elapsedPatternStringProperty],
       (tMyr: number, pattern: string) => pattern.replace("{{value}}", tMyr.toFixed(0)),
@@ -68,6 +76,7 @@ export class PlateMotionTimeControlPanel extends PlateTectonicsPanel {
       [model.animationStartedProperty, model.timer.isPlayingProperty, model.isFinishedProperty],
       (started: boolean, playing: boolean, finished: boolean) => started && !playing && !finished,
     );
+
     const stepButton = new StepForwardButton({
       ...FLAT_BUTTON_APPEARANCE_OPTIONS,
       radius: 14,
@@ -136,20 +145,27 @@ export class PlateMotionTimeControlPanel extends PlateTectonicsPanel {
           fill: PlateTectonicsColors.accentColorProperty,
           maxWidth: CONTROL_PANEL_WIDTH - 30,
         }),
-        new HBox({ spacing: 10, align: "center", children: [playPauseButton, stepButton] }),
         new VBox({
-          spacing: 2,
+          spacing: 8,
           align: "left",
+          visibleProperty: automatic,
           children: [
-            new Text(motion.speedStringProperty, {
-              font: LABEL_FONT,
-              fill: PlateTectonicsColors.textColorProperty,
-              maxWidth: SLIDER_WIDTH,
-            }),
-            speedSlider,
-            new HBox({
-              spacing: SLIDER_WIDTH - 88,
-              children: [endLabel(motion.slowStringProperty), endLabel(motion.fastStringProperty)],
+            new HBox({ spacing: 10, align: "center", children: [playPauseButton, stepButton] }),
+            new VBox({
+              spacing: 2,
+              align: "left",
+              children: [
+                new Text(motion.speedStringProperty, {
+                  font: LABEL_FONT,
+                  fill: PlateTectonicsColors.textColorProperty,
+                  maxWidth: SLIDER_WIDTH,
+                }),
+                speedSlider,
+                new HBox({
+                  spacing: SLIDER_WIDTH - 88,
+                  children: [endLabel(motion.slowStringProperty), endLabel(motion.fastStringProperty)],
+                }),
+              ],
             }),
           ],
         }),
@@ -168,6 +184,7 @@ export class PlateMotionTimeControlPanel extends PlateTectonicsPanel {
     this.disposeEmitter.addListener(() => {
       canStep.dispose();
       elapsed.dispose();
+      automatic.dispose();
       running.dispose();
     });
   }

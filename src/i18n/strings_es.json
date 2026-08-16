@@ -71,7 +71,13 @@
     "trench": "Fosa",
     "ridge": "Dorsal oceánica",
     "arc": "Arco volcánico",
-    "mountains": "Cordillera"
+    "mountains": "Cordillera",
+    "continentalCrustLabel": "Corteza continental",
+    "youngOceanicCrustLabel": "Corteza oceánica joven",
+    "oldOceanicCrustLabel": "Corteza oceánica antigua",
+    "motionMode": "Movimiento",
+    "automatic": "Automático",
+    "manual": "Manual"
   },
   "deepTime": {
     "title": "Tiempo profundo",
@@ -140,7 +146,8 @@
     "upperMantle": "Manto superior",
     "lowerMantle": "Manto inferior",
     "outerCore": "Núcleo externo",
-    "innerCore": "Núcleo interno"
+    "innerCore": "Núcleo interno",
+    "lithosphere": "Litosfera"
   },
   "dataSources": "Placas: Bird (2003) · Terremotos: USGS · Volcanes: NOAA/GVP · Relieve: NOAA · Edad del fondo: EarthByte",
   "a11y": {
@@ -228,10 +235,10 @@
     "plateMotion": {
       "screenSummary": {
         "playArea": "El área de juego muestra un corte transversal del límite entre dos placas tectónicas. Hasta que se eligen las placas está vacío, con una zona de colocación a cada lado. Cuando ambos lados tienen placa y se ha elegido un tipo de límite, el reloj avanza y el límite evoluciona: una placa que se hunde, un océano que se abre o montañas que se elevan.",
-        "controlArea": "El área de control tiene tres piezas de corteza para arrastrar a las zonas de destino, un selector de tipo de límite, controles de reproducción, pausa y paso con un deslizador de velocidad, los botones Rebobinar y Corteza nueva, una opción de qué colorea la roca, una opción entre un bloque tridimensional y una sección plana con un deslizador de exageración vertical, y un botón Reiniciar todo.",
+        "controlArea": "El área de control tiene tres piezas de corteza para colocar en las zonas de destino, una elección entre movimiento automático y manual, un selector de tipo de límite, controles de reproducción, pausa y paso con un deslizador de velocidad, los botones Rebobinar y Nueva corteza, una elección de qué colorea la roca, una elección entre un bloque tridimensional y una sección plana con un deslizador de exageración vertical, y un botón Reiniciar todo.",
         "interactionHint": "Pon corteza oceánica antigua frente a un continente y haz que converjan; observa dónde aparecen los volcanes respecto a la fosa."
       },
-      "currentDetails": "{{plates}} {{motion}} {{time}} {{view}}",
+      "currentDetails": "{{plates}} {{motion}} {{mode}} {{time}} {{view}}",
       "platesNone": "Ambas zonas de colocación están vacías.",
       "platesOne": "Una zona de colocación tiene placa; la otra está vacía.",
       "platesBoth": "Corteza {{left}} a la izquierda, corteza {{right}} a la derecha.",
@@ -246,7 +253,7 @@
       "timeFinished": "El límite ha completado sus {{value}} millones de años.",
       "controls": {
         "crustPiece": "Corteza {{name}}",
-        "crustPieceHelp": "Arrástrala a una de las dos zonas de colocación, o pulsa Intro para ponerla en la primera que esté vacía.",
+        "crustPieceHelp": "Pulsa para tomar esta corteza y luego pulsa una zona de destino para colocarla en ese lado. También se puede arrastrar directamente a una zona.",
         "leftDropZone": "Zona de colocación izquierda",
         "rightDropZone": "Zona de colocación derecha",
         "boundaryType": "Tipo de límite",
@@ -261,8 +268,17 @@
         "colorModeHelp": "Colorea el corte transversal por densidad, por temperatura o por ambas a la vez.",
         "showLabels": "Mostrar etiquetas",
         "probe": "Sonda",
-        "probeHelp": "Mueve la sonda por el corte transversal para leer la temperatura y la densidad donde se encuentra."
-      }
+        "probeHelp": "Mueve la sonda por el corte transversal para leer la temperatura y la densidad donde se encuentra.",
+        "motionMode": "Modo de movimiento",
+        "motionModeHelp": "En modo automático el reloj avanza solo una vez elegido el tipo de límite. En modo manual tiras tú de las placas y el tiempo solo avanza mientras lo haces.",
+        "leftHandle": "Tirador de la placa izquierda",
+        "rightHandle": "Tirador de la placa derecha",
+        "handleHelp": "Arrastra un tirador alejándolo del límite para separar las placas, o hacia él para juntarlas. Las teclas de flecha adelantan y retroceden el reloj.",
+        "leftDropZoneHelp": "Pulsa para colocar a la izquierda la corteza que has tomado, o para retirar la placa que ya está ahí.",
+        "rightDropZoneHelp": "Pulsa para colocar a la derecha la corteza que has tomado, o para retirar la placa que ya está ahí."
+      },
+      "modeAutomatic": "El reloj avanza solo.",
+      "modeManual": "El tiempo solo avanza cuando se mueve un tirador de placa."
     },
     "deepTime": {
       "screenSummary": {

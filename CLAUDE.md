@@ -63,6 +63,8 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/common/view/EarthBlockNode.ts` | **The 3-D block**: terrain, end walls, water, front face, camera |
 | `src/common/view/TerrainColors.ts` | The elevation ramp on the block's top surface |
 | `src/common/view/SectionPlacement.ts` | The one thing labels, the probe and the ruler need from a view |
+| `src/common/view/RangeLabelNode.ts` | An extent bar naming a layer — a measurement, not a caption |
+| `src/common/view/BoundaryLineNode.ts` | A dotted line along a surface, with an x window |
 | `src/common/view/SectionRulerNode.ts` | The draggable ruler |
 | `src/crust/view/CrustBlockNode.ts` | The Crust screen's 3-D block |
 | `src/plate-motion/view/PlateMotionBlockNode.ts` | The Plate Motion screen's 3-D block |
@@ -75,6 +77,10 @@ Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTe
 | `src/plate-motion/model/PlateGeometry.ts` | **The whole behaviour port**: `(motion, plates, t) → shape` |
 | `src/plate-motion/model/PlateMotionModel.ts` | The three-state machine and the clock |
 | `src/plate-motion/view/PlateMotionCanvasNode.ts` | The painted boundary |
+| `src/plate-motion/view/CrustChooserPanel.ts` | The three crust pieces: press to pick one up, or drag it into a zone |
+| `src/plate-motion/view/PlateMotionLabelsNode.ts` | The drop zones and every name on the section |
+| `src/plate-motion/view/PlateHandleNode.ts` | Manual mode: drag a plate, and the drag runs the clock |
+| `src/plate-motion/view/PlayModeControl.ts` | Automatic / Manual |
 | `src/common/DeepTimeReconstruction.ts` | Slerps a published model's sampled rotations; `IDENTITY_ROTATION_SLOT` |
 | `src/common/view/GlobeFeaturePainter.ts` | **Sphere-on-a-disc path work**, shared by both globes |
 | `src/common/data/generated/plateHistoryData.ts` | Rotation table + coastlines — the half that moves *continuously* |
@@ -313,7 +319,9 @@ open PRs that fight the overrides. Revisit when SceneryStack drops or re-pins th
 | `tests/EarthBlockNode.test.ts` | The block's projection and its front-face inverse |
 | `tests/TerrainColors.test.ts` | The elevation ramp on the block's surface |
 | `tests/SectionPlacement.test.ts` | Both views agreeing about what a section point means |
+| `tests/RangeLabelNode.test.ts` | Extent geometry in both views, the off-viewport clamp, the collapsed style |
 | `tests/SectionRulerNode.test.ts` | Tick numbering and the ruler surviving a section that gives it no room |
+| `tests/PlateMotionLabelsNode.test.ts` | Drop zones as drag targets: which side a release lands on, in both views |
 | `tests/EarthMaterial.test.ts` | The two colour ramps and the combined mode |
 | `tests/IsostaticRelaxation.test.ts` | Convergence, no overshoot, frame-rate independence |
 | `tests/CrustModel.test.ts` | Slider → density → elevation chain, probe, reset |

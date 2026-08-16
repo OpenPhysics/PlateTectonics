@@ -71,7 +71,13 @@
     "trench": "Trench",
     "ridge": "Spreading ridge",
     "arc": "Volcanic arc",
-    "mountains": "Mountain belt"
+    "mountains": "Mountain belt",
+    "continentalCrustLabel": "Continental crust",
+    "youngOceanicCrustLabel": "Young oceanic crust",
+    "oldOceanicCrustLabel": "Old oceanic crust",
+    "motionMode": "Motion",
+    "automatic": "Automatic",
+    "manual": "Manual"
   },
   "deepTime": {
     "title": "Deep Time",
@@ -140,7 +146,8 @@
     "upperMantle": "Upper mantle",
     "lowerMantle": "Lower mantle",
     "outerCore": "Outer core",
-    "innerCore": "Inner core"
+    "innerCore": "Inner core",
+    "lithosphere": "Lithosphere"
   },
   "dataSources": "Plates: Bird (2003) · Earthquakes: USGS · Volcanoes: NOAA/GVP · Relief: NOAA · Seafloor age: EarthByte",
   "a11y": {
@@ -228,10 +235,10 @@
     "plateMotion": {
       "screenSummary": {
         "playArea": "The play area shows a cross-section through the boundary between two tectonic plates. Until plates are chosen it is empty, with a drop zone on each side. Once both sides have a plate and a boundary type has been chosen, the clock runs and the boundary evolves — a slab descending, an ocean opening, or mountains rising.",
-        "controlArea": "The control area has three crust pieces to drag into the drop zones, a boundary type chooser, play, pause and step controls with a speed slider, Rewind and New Crust buttons, a choice of what colours the rock, a choice between a three-dimensional block and a flat section with a vertical-exaggeration slider, and a Reset All button.",
+        "controlArea": "The control area has three crust pieces to place in the drop zones, a choice between automatic and manual motion, a boundary type chooser, play, pause and step controls with a speed slider, Rewind and New Crust buttons, a choice of what colours the rock, a choice between a three-dimensional block and a flat section with a vertical-exaggeration slider, and a Reset All button.",
         "interactionHint": "Put old oceanic crust against a continent and converge them, and watch where the volcanoes appear relative to the trench."
       },
-      "currentDetails": "{{plates}} {{motion}} {{time}} {{view}}",
+      "currentDetails": "{{plates}} {{motion}} {{mode}} {{time}} {{view}}",
       "platesNone": "Both drop zones are empty.",
       "platesOne": "One drop zone has a plate; the other is empty.",
       "platesBoth": "{{left}} crust on the left, {{right}} crust on the right.",
@@ -246,7 +253,7 @@
       "timeFinished": "The boundary has run its full {{value}} million years.",
       "controls": {
         "crustPiece": "{{name}} crust",
-        "crustPieceHelp": "Drag this into one of the two drop zones, or press Enter to place it in the first empty one.",
+        "crustPieceHelp": "Press to pick this crust up, then press a drop zone to place it on that side. It can also be dragged straight into a zone.",
         "leftDropZone": "Left drop zone",
         "rightDropZone": "Right drop zone",
         "boundaryType": "Boundary type",
@@ -261,8 +268,17 @@
         "colorModeHelp": "Colour the cross-section by density, by temperature, or by both at once.",
         "showLabels": "Show labels",
         "probe": "Probe",
-        "probeHelp": "Move the probe through the cross-section to read the temperature and density where it sits."
-      }
+        "probeHelp": "Move the probe through the cross-section to read the temperature and density where it sits.",
+        "motionMode": "Motion mode",
+        "motionModeHelp": "In automatic mode the clock runs on its own once a boundary type is chosen. In manual mode you pull the plates yourself and time advances only while you do.",
+        "leftHandle": "Left plate handle",
+        "rightHandle": "Right plate handle",
+        "handleHelp": "Drag a handle away from the boundary to pull the plates apart, or towards it to push them together. Arrow keys advance and retreat the clock.",
+        "leftDropZoneHelp": "Press to place the crust you have picked up on the left, or to clear the plate already there.",
+        "rightDropZoneHelp": "Press to place the crust you have picked up on the right, or to clear the plate already there."
+      },
+      "modeAutomatic": "The clock runs on its own.",
+      "modeManual": "Time advances only while a plate handle is moved."
     },
     "deepTime": {
       "screenSummary": {

@@ -48,8 +48,8 @@ export class DeepTimeControlPanel extends PlateTectonicsPanel {
         new Text(label, { font: LABEL_FONT, fill: PlateTectonicsColors.textColorProperty }),
         {
           boxWidth: 15,
-          checkboxColor: PlateTectonicsColors.controlSurfaceTextColorProperty,
-          checkboxColorBackground: PlateTectonicsColors.controlSurfaceColorProperty,
+          checkboxColor: PlateTectonicsColors.textColorProperty,
+          checkboxColorBackground: PlateTectonicsColors.panelBackgroundColorProperty,
           accessibleName: label,
           accessibleHelpText: help,
         },

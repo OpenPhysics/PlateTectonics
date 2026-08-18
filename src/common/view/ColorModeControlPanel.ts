@@ -102,7 +102,7 @@ export class ColorModeControlPanel extends PlateTectonicsPanel {
     const checkboxOptions = {
       boxWidth: 15,
       checkboxColor: PlateTectonicsColors.panelBorderColorProperty,
-      checkboxColorBackground: PlateTectonicsColors.controlSurfaceColorProperty,
+      checkboxColorBackground: PlateTectonicsColors.panelBackgroundColorProperty,
     };
 
     const labelsCheckbox = new Checkbox(options.showLabelsProperty, label(material.showLabelsStringProperty), {

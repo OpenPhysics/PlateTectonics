@@ -95,8 +95,8 @@ export class LayerControlPanel extends PlateTectonicsPanel {
           }),
           {
             // The box itself is a light control surface, so the tick has to be dark.
-            checkboxColor: PlateTectonicsColors.controlSurfaceTextColorProperty,
-            checkboxColorBackground: PlateTectonicsColors.controlSurfaceColorProperty,
+            checkboxColor: PlateTectonicsColors.textColorProperty,
+            checkboxColorBackground: PlateTectonicsColors.panelBackgroundColorProperty,
             boxWidth: 15,
             spacing: 7,
             accessibleName: entry.accessibleName,

@@ -284,6 +284,9 @@ A11y strings live under `a11y.earth` in each locale JSON, exposed via
   files are machine-formatted by `scripts/data/emit.ts` to keep numeric arrays compact.
 - **Canvas painting instead of Scenery nodes** for the map and the cross-sections, for
   the performance reason above. The interactive controls are all standard sun components.
+- **Hardcoded colors:** `shadeToCSS` in `src/common/view/QuadRenderer.ts` builds `rgb(...)` /
+  `rgba(...)` strings from a `Color` already chosen by the density/temperature ramps (or a
+  `ProfileColorProperty`). It is a format helper for flat-shaded faces, not a palette.
 
 
 ### `package.json` overrides

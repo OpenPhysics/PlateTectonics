@@ -1,6 +1,6 @@
 # Plate Tectonics
 
-[![CI](https://github.com/OpenPhysics/PlateTectonics/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenPhysics/PlateTectonics/actions/workflows/ci.yml)
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
 An interactive map of the Earth's tectonic plates, built with
 [SceneryStack](https://scenerystack.org/) — and drawn from real data throughout.
@@ -106,9 +106,9 @@ and full Interactive Description support.
 
 ## License
 
-GNU Affero General Public License v3.0 — see [OpenPhysics org license](https://github.com/OpenPhysics/.github/blob/main/LICENSE).
+GNU Affero General Public License v3.0 — see [OpenLyceum org license](https://github.com/OpenLyceum/.github/blob/main/LICENSE).
 
 ## Contributing
 
-See [OpenPhysics contributing guidelines](https://github.com/OpenPhysics/.github/blob/main/CONTRIBUTING.md).
+See [OpenLyceum contributing guidelines](https://github.com/OpenLyceum/.github/blob/main/CONTRIBUTING.md).
 Report bugs via GitHub Issues; use org issue templates.

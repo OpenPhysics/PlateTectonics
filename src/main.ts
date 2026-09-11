@@ -83,9 +83,9 @@ onReadyToLaunch(() => {
     // Shown in Help → About. The data sources are credited here as well as on
     // screen, because two of them ask for attribution and all of them deserve it.
     credits: {
-      leadDesign: "OpenPhysics",
-      softwareDevelopment: "OpenPhysics",
-      team: "OpenPhysics",
+      leadDesign: "OpenLyceum",
+      softwareDevelopment: "OpenLyceum",
+      team: "OpenLyceum",
       qualityAssurance: "",
       graphicArts: "",
       thanks:

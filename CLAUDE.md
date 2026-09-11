@@ -1,6 +1,6 @@
 # CLAUDE.md — Plate Tectonics
 
-Sim-specific context for AI assistants. General SceneryStack guidance: [OpenPhysics/.github/CLAUDE.md](https://github.com/OpenPhysics/.github/blob/main/CLAUDE.md).
+Sim-specific context for AI assistants. General SceneryStack guidance: [OpenLyceum/.github/CLAUDE.md](https://github.com/OpenLyceum/.github/blob/main/CLAUDE.md).
 
 ## Project
 
@@ -18,7 +18,7 @@ Changes that affect what is drawn should be checked against
 [`doc/model.md`](doc/model.md), which records where each number comes from and what
 each screen does not claim.
 
-Forked from [SceneryStackTemplate](https://github.com/OpenPhysics/SceneryStackTemplate).
+Forked from [SceneryStackTemplate](https://github.com/OpenLyceum/SceneryStackTemplate).
 
 ## Key files
 
@@ -276,7 +276,7 @@ The three required layers are wired up:
 
 A11y strings live under `a11y.earth` in each locale JSON, exposed via
 `StringManager.getEarthA11yStrings()`. Full checklist:
-[Baton/ACCESSIBILITY.md](https://github.com/OpenPhysics/Baton/blob/main/ACCESSIBILITY.md).
+[Baton/ACCESSIBILITY.md](https://github.com/OpenLyceum/Baton/blob/main/ACCESSIBILITY.md).
 
 ## Compliance carve-outs
 

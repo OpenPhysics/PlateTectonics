@@ -1,11 +1,11 @@
 # Credits — Plate Tectonics
 
 An interactive map of the Earth's tectonic plates, built with SceneryStack as part of
-the [OpenPhysics](https://github.com/OpenPhysics) fleet.
+the [OpenLyceum](https://github.com/OpenLyceum) fleet.
 
 ## License
 
-GNU Affero General Public License v3.0 or later — see [org LICENSE](https://github.com/OpenPhysics/.github/blob/main/LICENSE).
+GNU Affero General Public License v3.0 or later — see [org LICENSE](https://github.com/OpenLyceum/.github/blob/main/LICENSE).
 
 ## Data sources
 
@@ -70,4 +70,4 @@ grid itself is not redistributed.
 ## Acknowledgments
 
 Built with [SceneryStack](https://scenerystack.org/), from the
-[OpenPhysics SceneryStack template](https://github.com/OpenPhysics/SceneryStackTemplate).
+[OpenLyceum SceneryStack template](https://github.com/OpenLyceum/SceneryStackTemplate).
